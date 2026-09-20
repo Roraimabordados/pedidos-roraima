@@ -22,6 +22,8 @@
     --bronze-dark:#7A5B3B;
     --income:#2F6B4F;
     --income-bg:#E7F1EA;
+    --brand-green:#2E5443;
+    --brand-green-bg:#E7EEEA;
     --late:#A23E3E;
     --late-bg:#FBEBEA;
     --ready:#8C5A2C;
@@ -228,16 +230,21 @@
   }
   .capacity-list{display:flex; flex-direction:column; gap:6px; margin-bottom:6px;}
   .capacity-row{
-    display:grid; grid-template-columns:110px 1fr 70px; align-items:center; gap:10px;
+    display:grid; grid-template-columns:110px 1fr 65px 100px; align-items:center; gap:10px;
     padding:7px 10px; border:1px solid var(--line); border-radius:6px; font-size:12.5px; background:var(--card);
   }
-  .capacity-row.full{border-color:var(--late); background:var(--late-bg);}
+  .capacity-row.full{border-color:var(--brand-green); background:var(--brand-green-bg);}
   .capacity-row.near{border-color:var(--ready); background:var(--ready-bg);}
   .capacity-row .cap-date{font-weight:500;}
-  .capacity-bar{height:7px; border-radius:4px; background:var(--line); overflow:hidden; position:relative;}
-  .capacity-bar-fill{height:100%; background:var(--income); transition:width .25s ease;}
-  .capacity-row.near .capacity-bar-fill{background:var(--ready);}
-  .capacity-row.full .capacity-bar-fill{background:var(--late);}
+  .capacity-bar{height:11px; border-radius:6px; background:var(--line); overflow:hidden; position:relative; box-shadow:inset 0 1px 2px rgba(0,0,0,.08);}
+  .capacity-bar-fill{
+    height:100%; border-radius:6px;
+    background:linear-gradient(90deg, var(--bronze), var(--gold));
+    box-shadow:0 0 8px rgba(212,175,122,.55);
+    transition:width .6s cubic-bezier(.22,.9,.32,1);
+  }
+  .capacity-row.near .capacity-bar-fill{background:linear-gradient(90deg, var(--gold), #F0D9AE); box-shadow:0 0 8px rgba(212,175,122,.75);}
+  .capacity-row.full .capacity-bar-fill{background:var(--gold); box-shadow:0 0 8px rgba(212,175,122,.65);}
   .capacity-bar-preview{
     position:absolute; top:0; height:100%; background:var(--gold);
     transition:width .2s ease, left .2s ease; animation:capacityPulse 1.1s ease-in-out infinite;
@@ -245,10 +252,13 @@
   @keyframes capacityPulse{0%,100%{opacity:.65;} 50%{opacity:1;}}
   .cap-preview-tag{color:var(--bronze-dark); font-weight:600; font-size:11px;}
   .capacity-row .cap-count{text-align:right; font-family:'IBM Plex Mono',monospace;}
+  .capacity-row .cap-remaining{text-align:right; font-size:11px; font-weight:600; color:var(--brand-green); white-space:nowrap;}
+  .capacity-row.near .cap-remaining{color:var(--ready);}
+  .capacity-row.full .cap-remaining{color:var(--brand-green); font-weight:600;}
   .capacity-hint{font-size:12px; margin-top:4px; padding:6px 8px; border-radius:6px;}
   .capacity-hint.ok{color:var(--income); background:var(--income-bg);}
   .capacity-hint.near{color:var(--ready); background:var(--ready-bg);}
-  .capacity-hint.full{color:var(--late); background:var(--late-bg);}
+  .capacity-hint.full{color:var(--brand-green); background:var(--brand-green-bg);}
 
   #accessGate{
     position:fixed; inset:0; background:linear-gradient(180deg,var(--cover) 0%, var(--cover-dark) 100%);
@@ -283,7 +293,7 @@
 
   @media (max-width:560px){
     .gate-box{padding:26px 20px;}
-    .capacity-row{grid-template-columns:80px 1fr 55px; font-size:11.5px;}
+    .capacity-row{grid-template-columns:70px 1fr 50px 72px; font-size:10.5px; gap:6px;}
     .capacity-panel{padding:14px 14px 0;}
     .form-grid{grid-template-columns:1fr;}
     .hist-row{grid-template-columns:1fr 70px 90px 70px 70px; font-size:11.5px;}
@@ -303,6 +313,7 @@
     <div class="book-header">
       <h1 class="book-title">Pedidos de bordado</h1>
       <div class="header-right">
+        <button class="backup-btn" id="syncNowBtn" title="Traer los datos más recientes de Google Sheets">⟳ Sincronizar ahora</button>
         <button class="backup-btn" id="downloadBackupBtn" title="Descargar copia de seguridad">⭳ Copia de seguridad</button>
         <label class="backup-btn" for="restoreFile" title="Restaurar desde un archivo">⭱ Restaurar</label>
         <input type="file" id="restoreFile" accept="application/json" style="display:none;" />
@@ -540,9 +551,9 @@ function fmtFechaHora(iso){
   return d.toLocaleString('es-CO', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'});
 }
 
-// --- Respaldo en Google Sheets ---
-// Pega aquí el link que te da Google al "Implementar" el Apps Script (paso 3 de las instrucciones).
-// Mientras esté vacío, la app funciona igual pero sin enviar copia a Sheets.
+// --- Respaldo y sincronización con Google Sheets ---
+// Pega aquí el link que te da Google al "Implementar" el Apps Script (ver instrucciones).
+// Mientras esté vacío, la app funciona igual pero solo guarda en este navegador.
 const BACKUP_SHEET_URL = 'https://script.google.com/macros/s/AKfycbw6FkrMFVCJls0ICQiQ0dOIZVJnDL9cMiLxWnkjQ02C217mrqUryX_sPg03FnjDgZaxLw/exec';
 
 async function syncToSheet(){
@@ -556,6 +567,51 @@ async function syncToSheet(){
     });
   }catch(e){
     console.error('No se pudo enviar el respaldo a Sheets', e);
+  }
+}
+
+function loadFromSheet(){
+  return new Promise((resolve, reject) => {
+    if(!BACKUP_SHEET_URL){ resolve(null); return; }
+    const cbName = 'roraimaSheetCb_' + Date.now();
+    const script = document.createElement('script');
+    let finished = false;
+    window[cbName] = (data) => {
+      finished = true;
+      delete window[cbName];
+      script.remove();
+      resolve(data);
+    };
+    script.src = BACKUP_SHEET_URL + (BACKUP_SHEET_URL.includes('?') ? '&' : '?') + 'callback=' + cbName;
+    script.onerror = () => {
+      if(!finished){ delete window[cbName]; script.remove(); reject(new Error('No se pudo conectar a Sheets')); }
+    };
+    document.body.appendChild(script);
+    setTimeout(() => {
+      if(!finished){ delete window[cbName]; script.remove(); reject(new Error('Tiempo de espera agotado')); }
+    }, 8000);
+  });
+}
+
+async function sincronizarDesdeSheet(mostrarEstado){
+  if(!BACKUP_SHEET_URL) return;
+  if(mostrarEstado) document.getElementById('sheetStatus').textContent = '☁ Sincronizando…';
+  try{
+    const data = await loadFromSheet();
+    if(data && Array.isArray(data.pedidos)){
+      pedidos = data.pedidos;
+      metaDiaria = data.metaDiaria || metaDiaria;
+      document.getElementById('metaDiaria').value = metaDiaria;
+      await window.storage.set('pedidos', JSON.stringify(pedidos));
+      await window.storage.set('meta-diaria', String(metaDiaria));
+      render();
+      document.getElementById('sheetStatus').textContent = '☁ Sincronizado con Sheets';
+    }else{
+      document.getElementById('sheetStatus').textContent = '☁ Sheets vacío o sin datos aún';
+    }
+  }catch(e){
+    console.error('No se pudo sincronizar desde Sheets', e);
+    document.getElementById('sheetStatus').textContent = '☁ No se pudo conectar a Sheets';
   }
 }
 
@@ -582,9 +638,13 @@ async function loadAll(){
     metaDiaria = m ? (parseInt(m.value) || 60) : 60;
   }catch(e){ metaDiaria = 60; }
   document.getElementById('metaDiaria').value = metaDiaria;
-  document.getElementById('sheetStatus').textContent = BACKUP_SHEET_URL ? '☁ Respaldo en Sheets activo' : '☁ Respaldo en Sheets no configurado';
   render();
   setStatus('Guardado');
+  if(BACKUP_SHEET_URL){
+    await sincronizarDesdeSheet(true);
+  }else{
+    document.getElementById('sheetStatus').textContent = '☁ Respaldo en Sheets no configurado';
+  }
 }
 
 function isLate(p){
@@ -640,16 +700,28 @@ function renderCapacityPanel(previewDate, previewCantidad){
     let cls = '';
     if(total >= metaDiaria) cls = 'full';
     else if(total >= metaDiaria * 0.8) cls = 'near';
+    const faltan = metaDiaria - total;
+    const faltanTexto = faltan <= 0 ? '¡Meta llena!' : `Faltan ${faltan}`;
     const previewTag = extra > 0 ? ` <span class="cap-preview-tag">+${extra} nuevo</span>` : '';
     return `<div class="capacity-row ${cls}">
       <span class="cap-date">${ds}${previewTag}</span>
       <span class="capacity-bar">
-        <span class="capacity-bar-fill" style="width:${basePct}%"></span>
+        <span class="capacity-bar-fill" data-target="${basePct}" style="width:0%"></span>
         ${extra > 0 ? `<span class="capacity-bar-preview" style="width:${extraPct}%; left:${basePct}%;"></span>` : ''}
       </span>
       <span class="cap-count">${total}/${metaDiaria}</span>
+      <span class="cap-remaining">${faltanTexto}</span>
     </div>`;
   }).join('');
+
+  // Arranca las barras en 0% y las anima hasta su valor real, para que se vean "llenar".
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      list.querySelectorAll('.capacity-bar-fill').forEach(el => {
+        el.style.width = el.dataset.target + '%';
+      });
+    }, 30);
+  });
 }
 function updatePromesaHint(){
   const hint = document.getElementById('fPromesaHint');
@@ -1056,6 +1128,14 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
   });
+});
+
+document.getElementById('syncNowBtn').addEventListener('click', () => {
+  if(!BACKUP_SHEET_URL){
+    document.getElementById('sheetStatus').textContent = '☁ Respaldo en Sheets no configurado';
+    return;
+  }
+  sincronizarDesdeSheet(true);
 });
 
 document.getElementById('downloadBackupBtn').addEventListener('click', () => {
