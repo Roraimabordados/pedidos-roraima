@@ -543,7 +543,7 @@ function fmtFechaHora(iso){
 // --- Respaldo en Google Sheets ---
 // Pega aquí el link que te da Google al "Implementar" el Apps Script (paso 3 de las instrucciones).
 // Mientras esté vacío, la app funciona igual pero sin enviar copia a Sheets.
-const BACKUP_SHEET_URL = '';
+const BACKUP_SHEET_URL = 'https://script.google.com/macros/s/AKfycbw6FkrMFVCJls0ICQiQ0dOIZVJnDL9cMiLxWnkjQ02C217mrqUryX_sPg03FnjDgZaxLw/exec';
 
 async function syncToSheet(){
   if(!BACKUP_SHEET_URL) return;
