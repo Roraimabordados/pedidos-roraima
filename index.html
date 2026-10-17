@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pedidos de bordado</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -40,12 +41,12 @@
     padding:24px 14px 60px;
   }
   .brand-header{
-    max-width:820px; margin:0 auto 14px; display:flex; align-items:center;
+    max-width:980px; margin:0 auto 14px; display:flex; align-items:center;
     justify-content:center;
   }
   .brand-logo{height:110px; width:auto; max-width:90%;}
   .book{
-    max-width:820px;
+    max-width:980px;
     margin:0 auto;
     background:var(--paper);
     border-radius:14px;
@@ -291,6 +292,46 @@
   .restore-confirm{margin:0 26px 10px; padding:10px 14px; background:var(--ready-bg); border:1px solid var(--ready); border-radius:8px; font-size:13px; color:var(--ready);}
   .restore-confirm button{margin-left:10px; font-size:12px; padding:5px 10px; border-radius:6px; border:1px solid var(--ready); background:#fff; color:var(--ready); cursor:pointer;}
 
+
+  /* ---------- Vista por períodos (pipeline) ---------- */
+  .vista-bar{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px;}
+  .vista-bar .vb-label{font-size:12px; color:var(--ink-soft);}
+  .seg{display:flex; gap:6px; flex-wrap:wrap;}
+  .seg button{
+    --c:#2B2620;
+    font-family:'IBM Plex Sans',sans-serif; font-size:12.5px; font-weight:500; cursor:pointer;
+    display:inline-flex; align-items:center; gap:7px;
+    padding:7px 13px; border-radius:999px; border:1.5px solid var(--c); background:#fff; color:var(--c);
+    transition:background .18s, color .18s, transform .12s, box-shadow .18s;
+  }
+  .seg button::before{content:""; width:9px; height:9px; border-radius:50%; background:var(--c); transition:background .18s;}
+  .seg button:hover{transform:translateY(-1px); box-shadow:0 4px 10px rgba(0,0,0,.12);}
+  .seg button.on{background:var(--c); color:#fff;}
+  .seg button.on::before{background:#fff;}
+  .vista-bar select{font-size:12.5px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:#fff;}
+  .pipe-nav{margin-left:auto; display:none; gap:6px;}
+  .pipe-nav.show{display:flex;}
+  .pipe-nav button{width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:15px; color:var(--ink);}
+  .pipe-nav button:hover{background:var(--gold-light);}
+  .pipeline{
+    display:flex; gap:14px; align-items:flex-start; overflow-x:auto; padding:4px 2px 14px;
+    scroll-snap-type:x proximity; scrollbar-width:thin;
+  }
+  .col{
+    flex:0 0 min(360px, 88vw); scroll-snap-align:start;
+    background:var(--cbg, #fff); border:1px solid var(--line); border-top:6px solid var(--c);
+    border-radius:12px; padding:0 10px 4px;
+  }
+  .col.actual{box-shadow:0 0 0 2px var(--c), 0 8px 20px rgba(0,0,0,.12);}
+  .col-head{padding:12px 4px 10px; position:sticky; top:0;}
+  .col-tit{font-weight:600; font-size:14.5px; color:var(--c); display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .col-sub{font-size:11.5px; color:var(--ink-soft); margin-top:3px;}
+  .col-chip{font-size:10px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:20px; background:var(--c); color:#fff;}
+  .col-chip.venc{background:var(--late);}
+  .col .order-card{margin-bottom:10px; padding:12px 12px;}
+  .col .form-grid{grid-template-columns:1fr;}
+  .col .order-actions{gap:8px;}
+
   @media (max-width:560px){
     .gate-box{padding:26px 20px;}
     .capacity-row{grid-template-columns:70px 1fr 50px 72px; font-size:10.5px; gap:6px;}
@@ -418,6 +459,25 @@
         </div>
         <button class="btn-add" id="addBtn">Registrar pedido</button>
         <p class="form-error" id="formError">Completa cliente, monto y fecha de promesa.</p>
+      </div>
+
+      <div class="vista-bar">
+        <span class="vb-label">Ver por</span>
+        <div class="seg" id="segVista">
+          <button type="button" data-v="lista" style="--c:#2B2620">Lista</button>
+          <button type="button" data-v="dia" style="--c:#2F6B4F">Día</button>
+          <button type="button" data-v="semana" style="--c:#A67C52">Semana</button>
+          <button type="button" data-v="mes" style="--c:#35607F">Mes</button>
+          <button type="button" data-v="anio" style="--c:#7B4B7A">Año</button>
+        </div>
+        <select id="baseFecha" title="Con qué fecha se agrupan los pedidos">
+          <option value="promesa">según fecha de entrega</option>
+          <option value="recibido">según fecha de recibido</option>
+        </select>
+        <div class="pipe-nav" id="pipeNav">
+          <button type="button" id="pipeIzq" aria-label="Anterior">◀</button>
+          <button type="button" id="pipeDer" aria-label="Siguiente">▶</button>
+        </div>
       </div>
 
       <div class="toolbar">
@@ -554,7 +614,7 @@ function fmtFechaHora(iso){
 // --- Respaldo y sincronización con Google Sheets ---
 // Pega aquí el link que te da Google al "Implementar" el Apps Script (ver instrucciones).
 // Mientras esté vacío, la app funciona igual pero solo guarda en este navegador.
-const BACKUP_SHEET_URL = 'https://script.google.com/macros/s/AKfycbw6FkrMFVCJls0ICQiQ0dOIZVJnDL9cMiLxWnkjQ02C217mrqUryX_sPg03FnjDgZaxLw/exec';
+const BACKUP_SHEET_URL = '';
 
 async function syncToSheet(){
   if(!BACKUP_SHEET_URL) return;
@@ -817,7 +877,60 @@ function renderHistoryLog(p){
   </ul></div>`;
 }
 
-function renderActive(){
+
+// ---------- Vista por períodos: día / semana / mes / año ----------
+const GRUPOS = {
+  dia:    {c:'#2F6B4F', bg:'#EAF3ED'},
+  semana: {c:'#A67C52', bg:'#F8EFE3'},
+  mes:    {c:'#35607F', bg:'#E8EFF5'},
+  anio:   {c:'#7B4B7A', bg:'#F3EAF2'}
+};
+let vistaModo = 'dia';
+let vistaBase = 'promesa';
+try{
+  vistaModo = localStorage.getItem('roraima-ui-vista') || 'dia';
+  vistaBase = localStorage.getItem('roraima-ui-base') || 'promesa';
+}catch(e){}
+if(!['lista','dia','semana','mes','anio'].includes(vistaModo)) vistaModo = 'dia';
+if(!['promesa','recibido'].includes(vistaBase)) vistaBase = 'promesa';
+
+function parseDia(s){ const a = s.split('-').map(Number); return new Date(a[0], a[1]-1, a[2]); }
+function ymdDe(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+function infoGrupo(modo, fecha){
+  if(!fecha) return {key:'~', label:'Sin fecha', inicio:null, fin:null};
+  const d = parseDia(fecha);
+  if(modo === 'dia'){
+    const hoy = parseDia(todayStr());
+    const dif = Math.round((d - hoy) / 86400000);
+    const rel = dif === 0 ? 'Hoy · ' : dif === 1 ? 'Mañana · ' : dif === -1 ? 'Ayer · ' : '';
+    return {key:fecha, label: rel + cap(d.toLocaleDateString('es-CO',{weekday:'long', day:'numeric', month:'short'})), inicio:fecha, fin:fecha};
+  }
+  if(modo === 'semana'){
+    const w = (d.getDay() + 6) % 7;
+    const lun = new Date(d); lun.setDate(d.getDate() - w);
+    const dom = new Date(lun); dom.setDate(lun.getDate() + 6);
+    const f = (x) => x.toLocaleDateString('es-CO',{day:'numeric', month:'short'});
+    return {key:ymdDe(lun), label:'Semana ' + f(lun) + ' – ' + f(dom), inicio:ymdDe(lun), fin:ymdDe(dom)};
+  }
+  if(modo === 'mes'){
+    const fin = new Date(d.getFullYear(), d.getMonth()+1, 0);
+    return {key:fecha.slice(0,7), label:cap(d.toLocaleDateString('es-CO',{month:'long', year:'numeric'})), inicio:fecha.slice(0,7)+'-01', fin:ymdDe(fin)};
+  }
+  const y = fecha.slice(0,4);
+  return {key:y, label:'Año ' + y, inicio:y+'-01-01', fin:y+'-12-31'};
+}
+function sincronizarBarraVista(){
+  document.querySelectorAll('#segVista button').forEach(b => b.classList.toggle('on', b.dataset.v === vistaModo));
+  const base = document.getElementById('baseFecha');
+  if(base){ base.value = vistaBase; base.style.display = vistaModo === 'lista' ? 'none' : ''; }
+  const nav = document.getElementById('pipeNav');
+  if(nav) nav.classList.toggle('show', vistaModo !== 'lista');
+}
+
+let primeraVistaActiva = true;
+function renderActive(irAlActual){
+  if(primeraVistaActiva){ irAlActual = true; primeraVistaActiva = false; }
 
   const list = document.getElementById('ordersList');
   const activos = sortPedidos(pedidos.filter(p => !p.entregado));
@@ -825,7 +938,7 @@ function renderActive(){
     list.innerHTML = '<div class="empty-msg">No hay pedidos activos. Registra uno arriba.</div>';
     return;
   }
-  list.innerHTML = activos.map(p => {
+  const cardHtml = (p) => {
     const late = isLate(p);
     const ready = isReadyWaiting(p);
     let cardClass = 'order-card';
@@ -890,7 +1003,52 @@ function renderActive(){
       </div>
       ${openHistoryIds.has(p.id) ? renderHistoryLog(p) : ''}
     </div>`;
-  }).join('');
+  };
+
+  sincronizarBarraVista();
+  if(vistaModo === 'lista'){
+    list.innerHTML = activos.map(cardHtml).join('');
+    return;
+  }
+
+  const prevPipe = list.querySelector('.pipeline');
+  const prevScroll = prevPipe ? prevPipe.scrollLeft : 0;
+  const hoy = todayStr();
+  const grupos = new Map();
+  activos.forEach(p => {
+    const fecha = vistaBase === 'promesa' ? p.fechaPromesa : p.fechaCreacion;
+    const g = infoGrupo(vistaModo, fecha);
+    if(!grupos.has(g.key)) grupos.set(g.key, Object.assign({pedidos:[]}, g));
+    grupos.get(g.key).pedidos.push(p);
+  });
+  const cols = [...grupos.values()].sort((a,b) => {
+    if(a.key === '~') return 1;
+    if(b.key === '~') return -1;
+    return vistaBase === 'promesa' ? a.key.localeCompare(b.key) : b.key.localeCompare(a.key);
+  });
+  const color = GRUPOS[vistaModo];
+  list.innerHTML = '<div class="pipeline">' + cols.map(g => {
+    const actual = g.inicio && g.inicio <= hoy && hoy <= g.fin;
+    const vencido = vistaBase === 'promesa' && g.fin && g.fin < hoy;
+    const prendas = g.pedidos.reduce((s,p) => s + (Number(p.cantidad)||0), 0);
+    const valor = g.pedidos.reduce((s,p) => s + (Number(p.monto)||0), 0);
+    const chips = (actual ? '<span class="col-chip">Actual</span>' : '') + (vencido ? '<span class="col-chip venc">Vencido</span>' : '');
+    return `<section class="col${actual ? ' actual' : ''}" ${actual ? 'data-actual="1"' : ''} style="--c:${color.c}; --cbg:${color.bg};">
+      <div class="col-head">
+        <div class="col-tit">${escapeHtml(g.label)} ${chips}</div>
+        <div class="col-sub">${g.pedidos.length} pedido(s) &middot; ${prendas} prenda(s) &middot; ${fmt(valor)}</div>
+      </div>
+      ${sortPedidos(g.pedidos).map(cardHtml).join('')}
+    </section>`;
+  }).join('') + '</div>';
+
+  const pipe = list.querySelector('.pipeline');
+  if(irAlActual){
+    const col = pipe.querySelector('[data-actual="1"]') || pipe.querySelector('.col:not(.venc)');
+    pipe.scrollLeft = col ? Math.max(0, col.offsetLeft - pipe.offsetLeft - 2) : 0;
+  }else{
+    pipe.scrollLeft = prevScroll;
+  }
 }
 
 function renderHistory(){
@@ -1096,7 +1254,25 @@ document.getElementById('ordersList').addEventListener('change', (e) => {
   }
 });
 
-document.getElementById('sortMode').addEventListener('change', renderActive);
+document.getElementById('sortMode').addEventListener('change', () => renderActive());
+document.getElementById('segVista').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-v]');
+  if(!b) return;
+  vistaModo = b.dataset.v;
+  try{ localStorage.setItem('roraima-ui-vista', vistaModo); }catch(err){}
+  renderActive(true);
+});
+document.getElementById('baseFecha').addEventListener('change', (e) => {
+  vistaBase = e.target.value;
+  try{ localStorage.setItem('roraima-ui-base', vistaBase); }catch(err){}
+  renderActive(true);
+});
+function moverPipeline(dir){
+  const pipe = document.querySelector('#ordersList .pipeline');
+  if(pipe) pipe.scrollBy({left: dir * Math.min(380, pipe.clientWidth * 0.85), behavior:'smooth'});
+}
+document.getElementById('pipeIzq').addEventListener('click', () => moverPipeline(-1));
+document.getElementById('pipeDer').addEventListener('click', () => moverPipeline(1));
 
 document.getElementById('historyList').addEventListener('click', (e) => {
   const row = e.target.closest('.hist-row');
