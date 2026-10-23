@@ -343,6 +343,46 @@
     .order-actions{gap:10px;}
     .del-btn{margin-left:0;}
   }
+
+  /* ---------- Detalle del pedido (líneas) y orden de pedido en PDF ---------- */
+  .items-box{border:1px dashed #DDC9AE; border-radius:8px; padding:10px; background:#FEFCF8;}
+  .items-title{font-size:11px; color:var(--bronze-dark); font-weight:500; margin-bottom:6px;}
+  .it-head, .it-row{display:grid; grid-template-columns:1fr 70px 100px 92px 32px; gap:6px; align-items:center;}
+  .it-head{font-size:10.5px; color:var(--ink-soft); margin-bottom:4px;}
+  .it-row{margin-bottom:6px;}
+  .it-sub{font-family:'IBM Plex Mono',monospace; font-size:12px; text-align:right; color:var(--ink);}
+  .it-del{background:none; border:1px solid var(--line); border-radius:6px; color:var(--ink-soft); cursor:pointer; height:34px; font-size:16px; line-height:1;}
+  .it-del:hover{color:var(--late); border-color:var(--late);}
+  .it-add{background:none; border:1px dashed var(--bronze); color:var(--bronze-dark); border-radius:6px; padding:6px 12px; cursor:pointer; font-size:12px; margin-top:2px;}
+  .it-add:hover{background:var(--gold-light);}
+  .it-total{text-align:right; font-size:12.5px; margin-top:8px; color:var(--ink);}
+  input[readonly].auto-calc{background:var(--gold-light); color:var(--ink-soft);}
+  .btn-sec{
+    margin-top:12px; margin-left:8px; font-size:13px; font-weight:500; padding:9px 18px;
+    border:1.5px solid var(--cover); border-radius:6px; background:transparent; color:var(--cover); cursor:pointer;
+  }
+  .btn-sec:hover{background:var(--gold-light);}
+  .hist-btns{display:flex; flex-direction:column; gap:4px;}
+  .cat-box{border:1px dashed #DDC9AE; border-radius:8px; padding:8px 10px; background:#FEFCF8;}
+  .cat-box summary{cursor:pointer; font-size:12px; font-weight:500; color:var(--bronze-dark);}
+  .cat-row{display:grid; grid-template-columns:1fr 1.1fr 32px; gap:6px; margin-top:6px;}
+  @media (max-width:560px){ .cat-row{grid-template-columns:1fr 32px;} .cat-row .cat-t{grid-column:1/-1; grid-row:2;} }
+  .tal-box{border:1px dashed #DDC9AE; border-radius:8px; padding:8px 10px; background:#FEFCF8;}
+  .tal-det > summary{cursor:pointer; font-size:12px; font-weight:500; color:var(--bronze-dark); padding:2px 0;}
+  .tal-top, .tal-prendas, .tal-med{display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin-top:8px;}
+  .tal-tit{font-size:11px; font-weight:600; color:var(--bronze-dark); margin-top:12px; text-transform:uppercase; letter-spacing:.04em;}
+  .tal-sec label, .tal-top label{font-size:11px; color:var(--ink-soft); margin:0;}
+  .tal-abc{display:grid; grid-template-columns:100px 1fr; gap:6px 8px; align-items:center; margin-top:8px;}
+  .tal-det input.tal-s{width:64px;}
+  .tal-det input.tal-m{width:130px;}
+  .tal-det input.tal-w{flex:1; min-width:160px;}
+  @media (max-width:560px){
+    .it-head{display:none;}
+    .it-row{grid-template-columns:1fr 1fr 1fr 32px;}
+    .it-row .it-desc{grid-column:1/-1;}
+    .btn-sec{margin-left:0; display:block; width:100%;}
+    .btn-add{width:100%;}
+  }
 </style>
 </head>
 <body>
@@ -396,7 +436,7 @@
             <input id="fCelular" placeholder="300 000 0000" />
           </div>
           <div>
-            <label>Número de recibo</label>
+            <label>Número de orden / recibo (se sugiere el siguiente)</label>
             <input id="fRecibo" placeholder="0001" />
           </div>
           <div>
@@ -416,8 +456,14 @@
             <input id="fPromesa" type="date" />
             <div class="capacity-hint" id="fPromesaHint" style="display:none;"></div>
           </div>
+          <div class="full cat-box"><details><summary>Lista de precios y servicios (editable)</summary>
+            <div id="catRows"></div><button type="button" class="it-add" id="catAdd">+ Agregar servicio</button>
+            <p style="font-size:11px;color:var(--ink-soft);margin:6px 0 0;">Cada servicio tiene precio por cantidad: «desde cantidad : precio» (ej. 1:50100, 6:45250, 12:42500). Al escoger el servicio y la cantidad en el detalle, el valor se llena solo; siempre puedes cambiar cantidad y valor en cada pedido. Producciones grandes: primero el diseño y se cotiza aparte.</p></details></div>
+          <div class="full items-box" id="fItemsBox"></div>
+          <div class="full tal-box" id="fTalBox"></div>
+          <datalist id="catList"></datalist>
           <div>
-            <label>Cantidad de prendas / bordados</label>
+            <label>Cantidad total de prendas / bordados</label>
             <input id="fCantidad" type="number" min="1" step="1" placeholder="1" />
           </div>
           <div>
@@ -444,6 +490,17 @@
               <option value="completo">Total cancelado</option>
             </select>
           </div>
+          <div>
+            <label>Forma de pago (opcional)</label>
+            <select id="fFormaPago">
+              <option value="">Sin indicar</option>
+              <option>Efectivo</option>
+              <option>Transferencia</option>
+              <option>Nequi / Daviplata</option>
+              <option>Tarjeta</option>
+              <option>Otro</option>
+            </select>
+          </div>
           <div class="full">
             <label>Descripción del trabajo</label>
             <textarea id="fDescripcion" rows="2" placeholder="Qué se debe bordar y dónde (ej. logo en el pecho, nombre en la manga)"></textarea>
@@ -458,6 +515,7 @@
           </div>
         </div>
         <button class="btn-add" id="addBtn">Registrar pedido</button>
+        <button class="btn-sec" id="addPdfBtn" type="button">Registrar y generar orden PDF</button>
         <p class="form-error" id="formError">Completa cliente, monto y fecha de promesa.</p>
       </div>
 
@@ -599,7 +657,8 @@ const FIELD_LABELS = {
   fechaCreacion:'Fecha de recepción', fechaPromesa:'Fecha de promesa', monto:'Valor del pedido',
   cantidad:'Cantidad de prendas', colorHilos:'Color de hilos', descripcion:'Descripción del trabajo',
   crearDiseno:'Crear diseño', yaTieneDiseno:'Ya tiene diseño',
-  estado:'Estado del pedido', estadoPago:'Estado de pago', montoAbonado:'Monto abonado'
+  estado:'Estado del pedido', estadoPago:'Estado de pago', montoAbonado:'Monto abonado',
+  documento:'Cédula o NIT', formaPago:'Forma de pago'
 };
 function logChange(p, texto){
   if(!p.historialCambios) p.historialCambios = [];
@@ -665,6 +724,7 @@ async function sincronizarDesdeSheet(mostrarEstado){
       await window.storage.set('pedidos', JSON.stringify(pedidos));
       await window.storage.set('meta-diaria', String(metaDiaria));
       render();
+      sugerirRecibo();
       document.getElementById('sheetStatus').textContent = '☁ Sincronizado con Sheets';
     }else{
       document.getElementById('sheetStatus').textContent = '☁ Sheets vacío o sin datos aún';
@@ -698,6 +758,14 @@ async function loadAll(){
     metaDiaria = m ? (parseInt(m.value) || 60) : 60;
   }catch(e){ metaDiaria = 60; }
   document.getElementById('metaDiaria').value = metaDiaria;
+  try{
+    const u = await window.storage.get('ultimo-recibo');
+    ultimoRecibo = u ? (parseInt(u.value) || 0) : 0;
+  }catch(e){ ultimoRecibo = 0; }
+  await cargarCatalogo();
+  iniciarItemsForm();
+  iniciarTalForm();
+  sugerirRecibo();
   render();
   setStatus('Guardado');
   if(BACKUP_SHEET_URL){
@@ -854,8 +922,15 @@ function renderEditForm(p){
         </div>
         <div><label>Fecha de recepción</label><input type="date" class="edit-input" data-field="fechaCreacion" value="${p.fechaCreacion||''}" /></div>
         <div><label>Fecha de promesa</label><input type="date" class="edit-input" data-field="fechaPromesa" value="${p.fechaPromesa||''}" /></div>
-        <div><label>Valor del pedido</label><input type="number" step="0.01" class="edit-input" data-field="monto" value="${p.monto||0}" /></div>
-        <div><label>Cantidad de prendas</label><input type="number" min="1" step="1" class="edit-input" data-field="cantidad" value="${p.cantidad||1}" /></div>
+        <div class="full items-box">${itemsEditorHtml(p.items)}</div>
+        <div class="full tal-box">${talBoxHtml(p.tal, tieneTal(p.tal))}</div>
+        <div><label>Valor del pedido</label><input type="number" step="0.01" class="edit-input${(p.items&&p.items.length)?' auto-calc':''}" data-field="monto" value="${p.monto||0}" ${(p.items&&p.items.length)?'readonly':''} /></div>
+        <div><label>Cantidad de prendas</label><input type="number" min="1" step="1" class="edit-input${(p.items&&p.items.length)?' auto-calc':''}" data-field="cantidad" value="${p.cantidad||1}" ${(p.items&&p.items.length)?'readonly':''} /></div>
+        <div><label>Forma de pago</label>
+          <select class="edit-input" data-field="formaPago">
+            ${['','Efectivo','Transferencia','Nequi / Daviplata','Tarjeta','Otro'].map(o => `<option value="${o}" ${(p.formaPago||'')===o?'selected':''}>${o||'Sin indicar'}</option>`).join('')}
+          </select>
+        </div>
         <div><label>Color de hilos</label><input class="edit-input" data-field="colorHilos" value="${escapeHtml(p.colorHilos||'')}" /></div>
         <div class="full"><label>Descripción del trabajo</label><textarea rows="2" class="edit-input" data-field="descripcion">${escapeHtml(p.descripcion||'')}</textarea></div>
         <div class="checks-row">
@@ -971,6 +1046,7 @@ function renderActive(irAlActual){
         &middot; Promesa: ${p.fechaPromesa || '-'} ${late ? `<span class="late-tag">&middot; retrasado ${daysLate(p)}d</span>` : ''}<br/>
         Entrega real: ${p.fechaEntregaReal || 'pendiente'} &middot; Valor: ${fmt(p.monto)} &middot; ${p.cantidad || 0} prenda(s)
       </div>
+      ${(p.items && p.items.length) ? `<div class="order-work"><span class="work-label">Detalle</span>${p.items.map(it => `${it.cant} &times; ${escapeHtml(it.desc || 'Bordado')} <span style="color:var(--ink-soft);">(${fmt(it.val)} c/u)</span>`).join('<br/>')}</div>` : ''}
       ${p.descripcion ? `<div class="order-work"><span class="work-label">Trabajo</span>${escapeHtml(p.descripcion)}</div>` : ''}
       ${p.colorHilos ? `<div class="order-work"><span class="work-label">Color de hilos</span>${escapeHtml(p.colorHilos)}</div>` : ''}
       <div class="badges">${badges.join('')}</div>
@@ -997,6 +1073,7 @@ function renderActive(irAlActual){
           <input type="number" step="0.01" class="inp-abonado" value="${p.montoAbonado || 0}" />
         </div>` : ''}
         <label class="action-check"><input type="checkbox" class="chk-deliver" ${p.entregado ? 'checked' : ''} /> Entregado</label>
+        <button class="del-btn print-orden" title="Generar la orden de pedido en PDF o imprimirla">Orden PDF</button>
         <button class="del-btn edit-pedido" title="Editar pedido">Editar</button>
         <button class="del-btn toggle-history" title="Ver historial de cambios">${openHistoryIds.has(p.id) ? 'Ocultar historial' : 'Historial'}</button>
         <button class="del-btn del-pedido" title="Eliminar pedido">Eliminar</button>
@@ -1075,7 +1152,10 @@ function renderHistory(){
         <span>${escapeHtml(p.recibo || '-')}</span>
         <span>${p.fechaEntregaReal || '-'}</span>
         <span class="hist-amount">${fmt(p.montoAbonado)}${restante(p) > 0 ? `<br/><span style="color:var(--late); font-weight:400; font-size:11px;">resta ${fmt(restante(p))}</span>` : ''}</span>
-        <button class="hist-undo undo-pedido" title="Regresar a pedidos activos">Deshacer</button>
+        <span class="hist-btns">
+          <button class="hist-undo print-orden-h" title="Orden de pedido en PDF">Orden PDF</button>
+          <button class="hist-undo undo-pedido" title="Regresar a pedidos activos">Deshacer</button>
+        </span>
       </div>`).join('');
   }
   const total = entregados.reduce((s,p) => s + (Number(p.montoAbonado)||0), 0);
@@ -1091,21 +1171,27 @@ function render(){
   renderHistory();
 }
 
-document.getElementById('addBtn').addEventListener('click', () => {
+function registrarPedido(){
   const cliente = document.getElementById('fCliente').value.trim();
   const celular = document.getElementById('fCelular').value.trim();
-  const recibo = document.getElementById('fRecibo').value.trim();
+  let recibo = document.getElementById('fRecibo').value.trim();
   const prioridad = document.getElementById('fPrioridad').value;
   const fechaCreacion = document.getElementById('fFechaCreacion').value || todayStr();
   const fechaPromesa = document.getElementById('fPromesa').value;
-  const cantidad = parseInt(document.getElementById('fCantidad').value) || 0;
-  const monto = parseFloat(document.getElementById('fMonto').value);
+  const items = leerItems(document.getElementById('fItemsBox'));
+  let cantidad = parseInt(document.getElementById('fCantidad').value) || 0;
+  let monto = parseFloat(document.getElementById('fMonto').value);
+  if(items.length){
+    cantidad = items.filter(it => !esDiseno(it)).reduce((s,it) => s + it.cant, 0);
+    monto = items.reduce((s,it) => s + it.cant * it.val, 0);
+  }
   const estado = document.getElementById('fEstado').value;
   const colorHilos = document.getElementById('fColorHilos').value.trim();
   const descripcion = document.getElementById('fDescripcion').value.trim();
   const crearDiseno = document.getElementById('fCrearDiseno').checked;
   const yaTieneDiseno = document.getElementById('fYaTieneDiseno').checked;
   const estadoPago = document.getElementById('fEstadoPago').value;
+  const formaPago = document.getElementById('fFormaPago').value;
   let montoAbonado = 0;
   if(estadoPago === 'completo') montoAbonado = monto;
   else if(estadoPago === 'abona') montoAbonado = parseFloat(document.getElementById('fMontoAbonado').value) || 0;
@@ -1113,27 +1199,47 @@ document.getElementById('addBtn').addEventListener('click', () => {
   if(!cliente || isNaN(monto) || !fechaPromesa || cantidad < 1){
     err.textContent = 'Completa cliente, monto, fecha de promesa y cantidad de prendas (mínimo 1).';
     err.style.display = 'block';
-    return;
+    return null;
+  }
+  if(!recibo) recibo = siguienteRecibo();
+  if(pedidos.some(p => (p.recibo || '').trim() === recibo)){
+    err.textContent = 'Ya existe un pedido con el número ' + recibo + '. Cambia el número de orden.';
+    err.style.display = 'block';
+    return null;
   }
   err.style.display = 'none';
   const nuevoPedido = {
     id: uid(), cliente, celular, recibo, prioridad, fechaCreacion, fechaPromesa, monto, cantidad,
+    items, formaPago, tal: leerTal(document.getElementById('fTalBox')),
     estado, colorHilos, descripcion, crearDiseno, yaTieneDiseno, estadoPago, montoAbonado,
     entregado:false, fechaEntregaReal:null, historialCambios:[]
   };
   logChange(nuevoPedido, `Pedido registrado: cliente ${cliente}, ${cantidad} prenda(s), valor ${fmt(monto)}, promesa ${fechaPromesa}, estado ${ESTADO_LABEL[estado]}.`);
   pedidos.unshift(nuevoPedido);
+  const n = numRecibo(recibo);
+  if(n > 0){ ultimoRecibo = n; guardarUltimoRecibo(); }
   ['fCliente','fCelular','fRecibo','fMonto','fPromesa','fCantidad','fColorHilos','fDescripcion','fMontoAbonado'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('fRecibo').dataset.auto = '';
   document.getElementById('fCrearDiseno').checked = false;
   document.getElementById('fYaTieneDiseno').checked = false;
   document.getElementById('fPrioridad').value = 'media';
   document.getElementById('fEstado').value = 'diseno';
   document.getElementById('fEstadoPago').value = 'pendiente';
+  document.getElementById('fFormaPago').value = '';
   document.getElementById('fAbonoWrap').style.display = 'none';
   document.getElementById('fFechaCreacion').value = todayStr();
   document.getElementById('fPromesaHint').style.display = 'none';
+  iniciarItemsForm();
+  iniciarTalForm();
+  sugerirRecibo();
   render();
   savePedidos();
+  return nuevoPedido;
+}
+document.getElementById('addBtn').addEventListener('click', () => { registrarPedido(); });
+document.getElementById('addPdfBtn').addEventListener('click', () => {
+  const p = registrarPedido();
+  if(p) imprimirOrden(p);
 });
 
 document.getElementById('fPromesa').addEventListener('input', updatePromesaHint);
@@ -1147,6 +1253,7 @@ document.getElementById('metaDiaria').addEventListener('input', (e) => {
 
 document.getElementById('fCrearDiseno').addEventListener('change', (e) => {
   if(e.target.checked) document.getElementById('fYaTieneDiseno').checked = false;
+  lineaDiseno(document.getElementById('fItemsBox'), e.target.checked); aplicarItemsForm();
 });
 document.getElementById('fYaTieneDiseno').addEventListener('change', (e) => {
   if(e.target.checked) document.getElementById('fCrearDiseno').checked = false;
@@ -1159,6 +1266,14 @@ document.getElementById('ordersList').addEventListener('click', (e) => {
   const card = e.target.closest('.order-card');
   if(!card) return;
   const id = card.dataset.id;
+  if(e.target.closest('.items-box')){
+    if(itemsClick(e, e.target.closest('.items-box'))) return;
+  }
+  if(e.target.classList.contains('print-orden')){
+    const pp = pedidos.find(x => x.id === id);
+    if(pp) imprimirOrden(pp);
+    return;
+  }
   if(e.target.classList.contains('del-pedido')){
     pedidos = pedidos.filter(p => p.id !== id);
     render();
@@ -1191,6 +1306,23 @@ document.getElementById('ordersList').addEventListener('click', (e) => {
       p[field] = nuevo;
     });
     if(p.crearDiseno) p.yaTieneDiseno = false;
+    const boxItems = card.querySelector('.items-box');
+    if(boxItems){
+      const nuevosItems = leerItems(boxItems);
+      const antesItems = JSON.stringify(p.items || []);
+      p.items = nuevosItems;
+      if(nuevosItems.length){
+        p.cantidad = nuevosItems.filter(it => !esDiseno(it)).reduce((s,it) => s + it.cant, 0) || p.cantidad || 1;
+        p.monto = nuevosItems.reduce((s,it) => s + it.cant * it.val, 0);
+      }
+      if(JSON.stringify(nuevosItems) !== antesItems) cambios.push('Detalle del pedido actualizado (' + nuevosItems.length + ' línea(s)).');
+    }
+    const boxTal = card.querySelector('.tal-box');
+    if(boxTal){
+      const nt = leerTal(boxTal);
+      if(JSON.stringify(nt) !== JSON.stringify(p.tal || {})){ p.tal = nt; cambios.push('Datos de la orden (prendas, ubicación, medidas) actualizados.'); }
+    }
+    if(p.estadoPago === 'completo') p.montoAbonado = p.monto;
     if(cambios.length){
       cambios.forEach(c => logChange(p, c));
     }
@@ -1209,8 +1341,10 @@ document.getElementById('ordersList').addEventListener('change', (e) => {
   if(!card) return;
   const p = pedidos.find(x => x.id === card.dataset.id);
   if(!p) return;
-  if(e.target.classList.contains('edit-crear-diseno') && e.target.checked){
-    card.querySelector('.edit-ya-diseno').checked = false;
+  if(e.target.classList.contains('edit-crear-diseno')){
+    if(e.target.checked) card.querySelector('.edit-ya-diseno').checked = false;
+    const bi = card.querySelector('.items-box');
+    if(bi && p.items && p.items.length){ lineaDiseno(bi, e.target.checked); aplicarItemsEdit(bi); }
   }
   if(e.target.classList.contains('edit-ya-diseno') && e.target.checked){
     card.querySelector('.edit-crear-diseno').checked = false;
@@ -1277,6 +1411,11 @@ document.getElementById('pipeDer').addEventListener('click', () => moverPipeline
 document.getElementById('historyList').addEventListener('click', (e) => {
   const row = e.target.closest('.hist-row');
   if(!row || !row.dataset.id) return;
+  if(e.target.classList.contains('print-orden-h')){
+    const pp = pedidos.find(x => x.id === row.dataset.id);
+    if(pp) imprimirOrden(pp);
+    return;
+  }
   if(e.target.classList.contains('undo-pedido')){
     const p = pedidos.find(x => x.id === row.dataset.id);
     if(!p) return;
@@ -1367,6 +1506,518 @@ document.getElementById('restoreFile').addEventListener('change', (e) => {
   };
   reader.readAsText(file);
 });
+
+// =====================================================================
+//  ORDEN DE PEDIDO: detalle por líneas, número consecutivo y PDF
+// =====================================================================
+
+// Datos que salen en el encabezado de la orden. Cambia aquí lo que necesites.
+const NEGOCIO = {
+  nombre:'Roraima Diseños y Bordados',
+  nit:'',          // opcional: escribe tu NIT o cédula para que aparezca en la orden
+  direccion:'Edf. Copal, Cra 45 El Palo #49-81 Of 201, La Candelaria, Medellín',
+  telefono:'+57 301 439 5038',
+  web:'roraimabordados.com',
+  nota:''          // opcional: condiciones o mensaje al pie (ej. "Pedido sujeto a aprobación del diseño")
+};
+
+// ---------- Número consecutivo ----------
+let ultimoRecibo = 0;
+function numRecibo(r){
+  const m = String(r || '').match(/\d+/g);
+  return m ? parseInt(m[m.length - 1], 10) : 0;
+}
+function siguienteRecibo(){
+  let base = ultimoRecibo;
+  if(!base) base = pedidos.length ? numRecibo(pedidos[0].recibo) : 0;
+  const ancho = Math.max(4, String(base).length);
+  return String(base + 1).padStart(ancho, '0');
+}
+function sugerirRecibo(){
+  const inp = document.getElementById('fRecibo');
+  if(!inp) return;
+  if(!inp.value || inp.dataset.auto === '1'){
+    inp.value = siguienteRecibo();
+    inp.dataset.auto = '1';
+  }
+}
+function guardarUltimoRecibo(){
+  try{ Promise.resolve(window.storage.set('ultimo-recibo', String(ultimoRecibo))).catch(() => {}); }catch(e){}
+}
+document.getElementById('fRecibo').addEventListener('input', () => {
+  document.getElementById('fRecibo').dataset.auto = '';
+});
+
+// ---------- Detalle del pedido (líneas) ----------
+function itemRowHtml(it){
+  it = it || {};
+  const c = Number(it.cant) || 0, v = Number(it.val) || 0;
+  return `<div class="it-row">
+    <input class="it-desc" list="catList" placeholder="Ej. Bordado, Diseño nuevo…" value="${escapeHtml(it.desc || '')}" />
+    <input class="it-cant" type="number" min="1" step="1" placeholder="Cant." value="${c || ''}" />
+    <input class="it-val" type="number" min="0" step="1" placeholder="Valor unit." value="${v || ''}" ${v ? 'data-manual="1"' : ''} />
+    <span class="it-sub">${fmt(c * v)}</span>
+    <button type="button" class="it-del" title="Quitar esta línea">&times;</button>
+  </div>`;
+}
+function itemsEditorHtml(items){
+  const filas = (items && items.length ? items : [{}]).map(itemRowHtml).join('');
+  const total = (items || []).reduce((s, it) => s + (Number(it.cant) || 0) * (Number(it.val) || 0), 0);
+  return `<div class="items-title">Detalle del pedido (en cada línea: qué se borda, cantidad y valor por unidad)</div>
+    <div class="it-head"><span>Descripción</span><span>Cant.</span><span>Valor unit.</span><span style="text-align:right;">Subtotal</span><span></span></div>
+    <div class="it-rows">${filas}</div>
+    <button type="button" class="it-add">+ Agregar línea</button>
+    <div class="it-total">Total del detalle: <b class="it-total-val">${fmt(total)}</b></div>`;
+}
+function leerItems(box){
+  return [...box.querySelectorAll('.it-row')].map(r => ({
+    desc: r.querySelector('.it-desc').value.trim(),
+    cant: parseFloat(r.querySelector('.it-cant').value) || 0,
+    val: parseFloat(r.querySelector('.it-val').value) || 0
+  })).filter(it => it.desc || it.cant || it.val);
+}
+function recalcItems(box){
+  let cant = 0, total = 0, n = 0;
+  box.querySelectorAll('.it-row').forEach(r => {
+    const c = parseFloat(r.querySelector('.it-cant').value) || 0;
+    const v = parseFloat(r.querySelector('.it-val').value) || 0;
+    r.querySelector('.it-sub').textContent = fmt(c * v);
+    if(c || v) n++;
+    if(!esDiseno({desc: r.querySelector('.it-desc').value})) cant += c;
+    total += c * v;
+  });
+  const t = box.querySelector('.it-total-val');
+  if(t) t.textContent = fmt(total);
+  return {cant, total, n};
+}
+function marcarAuto(inp, auto){
+  inp.readOnly = auto;
+  inp.classList.toggle('auto-calc', auto);
+}
+function aplicarItemsForm(){
+  const box = document.getElementById('fItemsBox');
+  const r = recalcItems(box);
+  const fC = document.getElementById('fCantidad'), fM = document.getElementById('fMonto');
+  if(r.n){
+    fC.value = r.cant || '';
+    fM.value = r.total;
+    marcarAuto(fC, true); marcarAuto(fM, true);
+  }else{
+    marcarAuto(fC, false); marcarAuto(fM, false);
+  }
+  updatePromesaHint();
+}
+function aplicarItemsEdit(box){
+  const card = box.closest('.order-card');
+  if(!card) return;
+  const m = card.querySelector('[data-field="monto"]'), c = card.querySelector('[data-field="cantidad"]');
+  const r = recalcItems(box);
+  if(!m || !c) return;
+  if(r.n){
+    m.value = r.total; c.value = r.cant;
+    marcarAuto(m, true); marcarAuto(c, true);
+  }else{
+    marcarAuto(m, false); marcarAuto(c, false);
+  }
+}
+// Maneja "+ Agregar línea" y "×". Devuelve true si el clic era de esos botones.
+function itemsClick(e, box){
+  const esForm = box.id === 'fItemsBox';
+  if(e.target.classList.contains('it-add')){
+    const rows = box.querySelector('.it-rows');
+    rows.insertAdjacentHTML('beforeend', itemRowHtml({}));
+    rows.lastElementChild.querySelector('.it-desc').focus();
+    return true;
+  }
+  if(e.target.classList.contains('it-del')){
+    const rows = box.querySelectorAll('.it-row');
+    if(rows.length > 1) e.target.closest('.it-row').remove();
+    else rows[0].querySelectorAll('input').forEach(i => i.value = '');
+    if(esForm) aplicarItemsForm(); else aplicarItemsEdit(box);
+    return true;
+  }
+  return false;
+}
+function iniciarItemsForm(){
+  document.getElementById('fItemsBox').innerHTML = itemsEditorHtml([]);
+  marcarAuto(document.getElementById('fCantidad'), false);
+  marcarAuto(document.getElementById('fMonto'), false);
+}
+(function(){
+  const box = document.getElementById('fItemsBox');
+  box.addEventListener('input', (e) => { if(e.target.closest('.it-row')){ itemAuto(e); aplicarItemsForm(); } });
+  box.addEventListener('click', (e) => { itemsClick(e, box); });
+  document.getElementById('ordersList').addEventListener('input', (e) => {
+    const b = e.target.closest('.items-box');
+    if(b && e.target.closest('.it-row')){ itemAuto(e); aplicarItemsEdit(b); }
+  });
+})();
+
+// ---------- Lista de precios por cantidad (editable) y autollenado del valor ----------
+const NOMBRE_DISENO = 'Diseño nuevo';
+const CAT_VERSION = 2;
+const CAT_DEFAULT = [
+  {n:'Polo + bordado punto corazón', t:[[1,50100],[6,45250],[12,42500]]},
+  {n:'Polo + bordado PC + estampado espalda', t:[[6,51550],[12,48800]]},
+  {n:'Polo + estampado PC + estampado espalda', t:[[6,45800],[12,40800]]},
+  {n:'Cuello redondo + bordado o estampado PC', t:[[1,38000],[6,34000],[12,29000]]},
+  {n:'Cuello redondo + bordado PC + estampado espalda', t:[[6,42550],[12,38500]]},
+  {n:'Cuello redondo + estampado PC + estampado espalda', t:[[6,41550],[12,36200]]},
+  {n:'Bordado punto corazón 9x9', t:[[1,10000],[6,9000],[12,8500],[24,7500],[36,6900]]},
+  {n:'Bordado espalda (hasta 30.000 puntadas)', t:[[1,22000],[12,20000]]},
+  {n:'Bordado nombre toalla (máx 20 cm)', t:[[1,18000],[12,15000]]},
+  {n:NOMBRE_DISENO, t:[[1,20000]]},
+  {n:'Bordado PC hospitales y universidades autorizadas', t:[[1,18000]]},
+  {n:'Bordado PC nombre y profesión', t:[[1,15000]]},
+  {n:'Bordado PC nombre y profesión + símbolo', t:[[1,18000]]},
+  {n:'Bordado apliques misión médica y estrella de la vida (par)', t:[[1,18000]]},
+  {n:'Pines', t:[[1,15000]]},
+  {n:'Clínica Soma + profesión', t:[[1,18000],[6,15000],[12,13000]]},
+  {n:'Promedan bata (v)', t:[[1,18000],[6,13000]]},
+  {n:'Promedan manga', t:[[1,15000],[6,13000]]}
+];
+let catalogo = JSON.parse(JSON.stringify(CAT_DEFAULT));
+function esDiseno(it){ return ((it && it.desc) || '').trim().toLowerCase() === NOMBRE_DISENO.toLowerCase(); }
+function tiersToText(t){ return (t || []).map(x => x[0] + ':' + x[1]).join(', '); }
+function textToTiers(s){
+  const out = [];
+  (s || '').split(',').forEach(tok => {
+    tok = tok.trim(); if(!tok) return;
+    const m = tok.split(':');
+    const num = (x) => parseFloat(String(x).replace(/[.\s$]/g, ''));
+    let min = 1, p;
+    if(m.length >= 2){ min = parseInt(m[0]) || 1; p = num(m[1]); } else p = num(tok);
+    if(!isNaN(p)) out.push([min, p]);
+  });
+  return out.sort((a, b) => a[0] - b[0]);
+}
+function precioTier(c, cant){
+  const t = (c && c.t) || [];
+  if(!t.length) return null;
+  let r = t[0][1];
+  t.forEach(x => { if(cant >= x[0]) r = x[1]; });
+  return r;
+}
+function precioDiseno(){
+  const c = catalogo.find(x => (x.n || '').trim().toLowerCase() === NOMBRE_DISENO.toLowerCase());
+  const p = precioTier(c, 1);
+  return p == null ? 20000 : p;
+}
+function precioPara(desc, cant){
+  const d = (desc || '').trim().toLowerCase();
+  if(!d) return null;
+  let mejor = null;
+  catalogo.forEach(c => {
+    const n = (c.n || '').trim().toLowerCase();
+    if(n && d.startsWith(n) && (!mejor || n.length > mejor.n.length)) mejor = {n, c};
+  });
+  return mejor ? precioTier(mejor.c, cant || 1) : null;
+}
+function guardarCatalogo(){
+  try{ Promise.resolve(window.storage.set('catalogo', JSON.stringify({v: CAT_VERSION, items: catalogo}))).catch(() => {}); }catch(e){}
+}
+function actualizarDatalist(){
+  const dl = document.getElementById('catList');
+  if(dl) dl.innerHTML = catalogo.filter(c => c.n).map(c => `<option value="${escapeHtml(c.n)}" label="${escapeHtml(tiersToText(c.t))}"></option>`).join('');
+}
+function renderCatalogo(){
+  actualizarDatalist();
+  const box = document.getElementById('catRows');
+  if(!box) return;
+  box.innerHTML = catalogo.map(c => `<div class="cat-row">
+    <input class="cat-n" placeholder="Servicio" value="${escapeHtml(c.n || '')}" />
+    <input class="cat-t" placeholder="desde cantidad : precio  (ej. 1:50100, 6:45250)" value="${escapeHtml(tiersToText(c.t))}" />
+    <button type="button" class="it-del cat-del" title="Quitar">&times;</button></div>`).join('');
+}
+async function cargarCatalogo(){
+  try{
+    const c = await window.storage.get('catalogo');
+    if(c){
+      const o = JSON.parse(c.value);
+      if(o && o.v === CAT_VERSION && Array.isArray(o.items) && o.items.length) catalogo = o.items;
+    }
+  }catch(e){}
+  renderCatalogo();
+}
+function leerCatalogoUI(){
+  catalogo = [...document.querySelectorAll('#catRows .cat-row')].map(r => ({
+    n: r.querySelector('.cat-n').value.trim(), t: textToTiers(r.querySelector('.cat-t').value)
+  })).filter(c => c.n);
+  guardarCatalogo(); actualizarDatalist();
+}
+(function(){
+  const rows = document.getElementById('catRows');
+  rows.addEventListener('input', leerCatalogoUI);
+  rows.addEventListener('click', (e) => {
+    if(!e.target.classList.contains('cat-del')) return;
+    e.target.closest('.cat-row').remove(); leerCatalogoUI(); renderCatalogo();
+  });
+  document.getElementById('catAdd').addEventListener('click', () => {
+    catalogo.push({n:'', t:[]}); renderCatalogo();
+    const n = rows.querySelectorAll('.cat-n'); n[n.length - 1].focus();
+  });
+})();
+// al escribir el servicio o la cantidad, se llena el valor según la lista (si no lo has cambiado a mano)
+function itemAuto(e){
+  const row = e.target.closest('.it-row');
+  if(!row) return;
+  const val = row.querySelector('.it-val'), cant = row.querySelector('.it-cant'), desc = row.querySelector('.it-desc');
+  if(e.target.classList.contains('it-val')){ val.dataset.manual = e.target.value ? '1' : ''; return; }
+  if(val.dataset.manual === '1') return;
+  if(!e.target.classList.contains('it-desc') && !e.target.classList.contains('it-cant')) return;
+  const p = precioPara(desc.value, parseFloat(cant.value) || 1);
+  if(p != null){
+    val.value = p;
+    if(!cant.value) cant.value = 1;
+  }
+}
+// "Crear diseño" agrega / quita la línea "Diseño nuevo" con su precio
+function lineaDiseno(box, on){
+  const rows = box.querySelector('.it-rows');
+  const existente = [...rows.querySelectorAll('.it-row')].find(r => esDiseno({desc: r.querySelector('.it-desc').value}));
+  if(on && !existente){
+    [...rows.querySelectorAll('.it-row')].forEach(r => {
+      if(!r.querySelector('.it-desc').value && !r.querySelector('.it-cant').value && !r.querySelector('.it-val').value) r.remove();
+    });
+    rows.insertAdjacentHTML('beforeend', itemRowHtml({desc: NOMBRE_DISENO, cant: 1, val: precioDiseno()}));
+  }else if(!on && existente){
+    existente.remove();
+    if(!rows.querySelector('.it-row')) rows.insertAdjacentHTML('beforeend', itemRowHtml({}));
+  }
+}
+
+// ---------- Datos tipo talonario (prendas, ubicaciones A/B/C, medidas, otros productos) ----------
+function talInp(path, val, ph, cls, type){
+  return `<input data-t="${path}" type="${type||'text'}" class="${cls||''}" value="${escapeHtml(val == null ? '' : String(val))}" placeholder="${escapeHtml(ph||'')}">`;
+}
+function talSeccion(k, d, conTitulo){
+  return `<div class="tal-sec">
+    ${conTitulo}
+    <div class="tal-abc">
+      <label>A (PC)</label>${talInp(k+'.A', d.A, 'Ej. logo en el pecho izquierdo')}
+      <label>B (PC D)</label>${talInp(k+'.B', d.B, '')}
+      <label>C (ESP)</label>${talInp(k+'.C', d.C, 'Ej. espalda')}
+      <label>Observaciones</label>${talInp(k+'.obs', d.obs, '')}
+    </div>
+    <div class="tal-med"><span>Medidas (cm):</span>
+      <label>A</label>${talInp(k+'.medA', d.medA, '', 'tal-s')}
+      <label>B</label>${talInp(k+'.medB', d.medB, '', 'tal-s')}
+      <label>C</label>${talInp(k+'.medC', d.medC, '', 'tal-s')}
+    </div>
+  </div>`;
+}
+function talBoxHtml(t, abierto){
+  t = t || {};
+  const pr = t.pr || {}, b = t.b || {}, o = t.o || {};
+  return `<details class="tal-det" ${abierto ? 'open' : ''}>
+    <summary>Datos de la orden: prendas, ubicación del bordado y medidas (como en el talonario)</summary>
+    <div class="tal-top"><label>Hora de entrega</label>${talInp('hora', t.hora, '', 'tal-m', 'time')}</div>
+    <div class="tal-sec">
+      <div class="tal-tit">Prendas</div>
+      <div class="tal-prendas">
+        <label>Polos</label>${talInp('pr.polos', pr.polos, '', 'tal-s', 'number')}
+        <label>Camisas</label>${talInp('pr.camisas', pr.camisas, '', 'tal-s', 'number')}
+        <label>T-shirt</label>${talInp('pr.tshirt', pr.tshirt, '', 'tal-s', 'number')}
+        <label>Batas</label>${talInp('pr.batas', pr.batas, '', 'tal-s', 'number')}
+        <label>Blusas médicas</label>${talInp('pr.blusas', pr.blusas, '', 'tal-s', 'number')}
+      </div>
+    </div>
+    ${talSeccion('b', b, '<div class="tal-tit">Bordado en las prendas (A = pecho izq., B = pecho der., C = espalda)</div>')}
+    ${talSeccion('o', o, `<div class="tal-tit">Otros productos</div>
+      <div class="tal-prendas"><label>Producto</label>${talInp('o.producto', o.producto, 'Ej. gorras, cuadros, bolsos', 'tal-w')}</div>`)}
+  </details>`;
+}
+function leerTal(box){
+  const t = {};
+  if(!box) return t;
+  box.querySelectorAll('[data-t]').forEach(inp => {
+    const v = inp.value.trim();
+    if(!v) return;
+    const ks = inp.dataset.t.split('.');
+    let o = t;
+    for(let i = 0; i < ks.length - 1; i++){ o = o[ks[i]] = o[ks[i]] || {}; }
+    o[ks[ks.length - 1]] = v;
+  });
+  return t;
+}
+function tieneTal(t){ return !!t && Object.keys(t).length > 0; }
+function iniciarTalForm(){
+  document.getElementById('fTalBox').innerHTML = talBoxHtml({}, true);
+}
+
+// ---------- Orden de pedido en PDF (se abre el diálogo de imprimir: "Guardar como PDF" o imprimir en papel) ----------
+function fmtFechaLarga(s){
+  if(!s) return '-';
+  return parseDia(s).toLocaleDateString('es-CO', {day:'numeric', month:'long', year:'numeric'});
+}
+function lineasOrden(p){
+  if(p.items && p.items.length){
+    return p.items.map(it => ({desc: it.desc || 'Bordado', cant: it.cant, val: it.val, sub: it.cant * it.val}));
+  }
+  const cant = Number(p.cantidad) || 1, total = Number(p.monto) || 0;
+  return [{desc: 'Pedido de bordado', cant, val: Math.round(total / cant), sub: total}];
+}
+function fmtCorta(s){
+  if(!s) return '';
+  const [y, m, d] = s.split('-');
+  return `${d}/${m}/${y.slice(2)}`;
+}
+function svgCamisa(atras){
+  const cuerpo = 'M30 14 L48 8 Q60 ' + (atras ? '16' : '22') + ' 72 8 L90 14 L112 40 L96 54 L88 46 L88 108 L32 108 L32 46 L24 54 L8 40 Z';
+  const caja = (x, y, l) => `<rect x="${x}" y="${y}" width="16" height="12" rx="2" fill="#fff"/><text x="${x + 8}" y="${y + 9.5}" font-size="9" text-anchor="middle" font-family="Arial" fill="#333">${l}</text>`;
+  const detalle = atras ? caja(52, 38, 'C') : `<path d="M60 22 L60 44" stroke="#555" stroke-width="1.5"/>` + caja(36, 38, 'B') + caja(68, 38, 'A');
+  return `<svg viewBox="0 0 120 116" width="108" height="104"><path d="${cuerpo}" fill="#8d8d8d" stroke="#555" stroke-width="1.2"/>${detalle}</svg>`;
+}
+function ordenHtml(p){
+  const logo = (document.querySelector('.brand-logo') || {}).src || '';
+  const t = p.tal || {}, pr = t.pr || {}, b = t.b || {}, o = t.o || {};
+  const lineas = lineasOrden(p);
+  const total = Number(p.monto) || 0;
+  const abonado = Number(p.montoAbonado) || 0;
+  const saldo = Math.max(0, total - abonado);
+  const estadoPagoTxt = p.estadoPago === 'completo' ? 'TOTAL CANCELADO' : (p.estadoPago === 'abona' ? 'ABONO RECIBIDO' : 'PAGO PENDIENTE (se cobra al entregar)');
+  const disenoTxt = p.crearDiseno ? 'Se debe crear el diseño' : (p.yaTieneDiseno ? 'El cliente ya tiene el diseño' : '');
+  const numero = escapeHtml(p.recibo || 'S/N');
+  const e = (x) => escapeHtml(x == null ? '' : String(x));
+  const sumaPr = ['polos','camisas','tshirt','batas','blusas'].reduce((s, k) => s + (parseFloat(pr[k]) || 0), 0);
+  const cantPren = b.cant || (sumaPr ? sumaPr : '');
+  const [fy, fm, fd] = (p.fechaCreacion || '').split('-');
+  const minFilas = 8;
+  const filas = lineas.map(l => `<tr><td class="c">${l.cant}</td><td>${e(l.desc)}</td><td class="r">${fmt(l.val)}</td><td class="r">${fmt(l.sub)}</td></tr>`);
+  while(filas.length < minFilas) filas.push('<tr><td class="c">&nbsp;</td><td></td><td></td><td></td></tr>');
+  const f = (lab, val, flex) => `<div class="f" style="flex:${flex || 1}"><span class="l">${lab}</span><span class="v">${e(val)}</span></div>`;
+  const abc = (d, obsExtra) => `
+      <div class="f"><span class="l">A (PC):</span><span class="v">${e(d.A)}</span></div><div class="obsl"></div>
+      <div class="f"><span class="l">B (PC D):</span><span class="v">${e(d.B)}</span></div><div class="obsl"></div>
+      <div class="f"><span class="l">C (ESP):</span><span class="v">${e(d.C)}</span></div><div class="obsl"></div>
+      <div class="f"><span class="l">Observaciones:</span><span class="v">${e(d.obs || obsExtra || '')}</span></div>
+      <div class="obsl"></div><div class="obsl"></div>
+      <div class="f med"><span class="l">Medidas (Cm.):</span><span class="l">A</span><span class="v">${e(d.medA)}</span><span class="l">B</span><span class="v">${e(d.medB)}</span><span class="l">C</span><span class="v">${e(d.medC)}</span></div>`;
+  const cajaCant = (n) => `<div class="cant"><span>Cantidad</span><b>${e(n)}</b></div>`;
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+<title>Orden ${numero} - ${e(p.cliente)}</title>
+<style>
+  @page{size:A4; margin:8mm 12mm;}
+  *{box-sizing:border-box;}
+  body{font-family:Arial,Helvetica,sans-serif; color:#222; font-size:11.5px; margin:0; padding-right:3px; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  .hdr{display:flex; justify-content:space-between; align-items:flex-start;}
+  .logo{position:relative; width:93mm; height:32mm; overflow:hidden; flex:none;}
+  .logo img{position:absolute; display:block; width:101.1mm; height:auto; left:-4.05mm; top:-18mm;}
+  .der{text-align:right;}
+  .pill{display:inline-block; background:#1d1d1d; color:#fff; border-radius:14px; padding:5px 16px; font-weight:bold; font-size:12px; letter-spacing:.04em;}
+  .no{margin-top:6px; font-size:12px; color:#b0262b; font-weight:bold;}
+  .no b{font-size:22px; letter-spacing:.06em; margin-left:6px;}
+  .fec{display:inline-flex; margin-top:5px; border:1px solid #444; border-radius:6px; overflow:hidden;}
+  .fec div{width:44px; text-align:center; font-size:11px; border-left:1px solid #444;}
+  .fec div:first-child{border-left:0;}
+  .fec small{display:block; font-size:8px; color:#555; background:#f1f1f1;}
+  .fec span{display:block; height:17px; line-height:17px; font-weight:bold;}
+  .fila{display:flex; gap:14px;}
+  .f{display:flex; align-items:flex-end; gap:5px; margin-top:7px;}
+  .f .l{font-weight:bold; white-space:nowrap; font-size:11px;}
+  .f .v{flex:1; border-bottom:1px solid #333; min-height:15px; padding:0 3px; font-size:11.5px; line-height:15px;}
+  .obsl{border-bottom:1px solid #333; height:14px; margin-top:4px;}
+  .sec{display:flex; gap:14px; margin-top:8px;}
+  .izq{width:44%;}
+  .der2{flex:1;}
+  .prendas{font-size:11px; line-height:2; margin-bottom:2px;}
+  .prendas u{display:inline-block; min-width:24px; text-align:center; border-bottom:1px solid #333; font-weight:bold; text-decoration:none; margin:0 6px 0 2px;}
+  .camisas{display:flex; gap:12px; justify-content:center;}
+  .cant{position:relative; border:1px solid #333; border-radius:7px; height:24px; width:104px; margin:0 0 6px auto; text-align:center;}
+  .cant span{position:absolute; top:-8px; left:50%; transform:translateX(-50%); background:#1d1d1d; color:#fff; font-size:9px; padding:1px 8px; border-radius:6px;}
+  .cant b{line-height:24px; font-size:13px;}
+  .otros{border:1px solid #333; min-height:112px; padding:6px 8px;}
+  .otros h5{margin:0 0 4px; font-size:17px; font-weight:normal;}
+  .otros div{font-size:12px; white-space:pre-wrap;}
+  .med .v{max-width:60px;}
+  table.t{width:100%; border-collapse:collapse;}
+  table.t th{border:1px solid #333; font-size:9.5px; padding:5px 4px; font-weight:bold; text-transform:uppercase;}
+  table.t td{border:1px solid #333; padding:0 5px; height:23px; font-size:11.5px;}
+  .c{text-align:center;} .r{text-align:right;}
+  .colores{width:30%;}
+  .colores h3{margin:0 0 6px; font-size:19px;}
+  .colores div{font-size:13px; line-height:1.5; white-space:pre-wrap;}
+  .pago{display:flex; gap:10px; margin-top:8px; align-items:stretch;}
+  .pago div{flex:1; border:1px solid #333; border-radius:6px; padding:5px 8px; font-size:11px;}
+  .pago b{display:block; font-size:14px;}
+  .pago .est{flex:1.6; text-align:center; font-weight:bold; letter-spacing:.03em; display:flex; align-items:center; justify-content:center; border-width:1.5px;}
+  .dir{text-align:center; font-weight:bold; font-size:12px; margin-top:22px; line-height:1.4;}
+  .pie{text-align:center; font-size:9px; color:#777; margin-top:6px;}
+</style></head><body>
+  <div class="hdr">
+    <div class="logo">${logo ? `<img src="${logo}" alt="Roraima">` : '<b style="font-size:26px">RORAIMA</b>'}</div>
+    <div class="der">
+      <span class="pill">ORDEN DE PEDIDO</span>
+      <div class="no">N&ordm; <b>${numero}</b></div>
+      <div class="fec"><div><small>DD</small><span>${e(fd)}</span></div><div><small>MM</small><span>${e(fm)}</span></div><div><small>AA</small><span>${e((fy || '').slice(2))}</span></div></div>
+    </div>
+  </div>
+
+  <div class="fila">${f('Señor (a):', p.cliente, 1)}</div>
+  <div class="fila">${f('Fecha de entrega:', fmtCorta(p.fechaPromesa), 1.3)}${f('Hora:', t.hora, 0.8)}${f('Tel.:', p.celular, 1.4)}</div>
+
+  <div class="sec">
+    <div class="izq">
+      <div class="prendas">Polos<u>${e(pr.polos)}</u>Camisas<u>${e(pr.camisas)}</u>T-shirt<u>${e(pr.tshirt)}</u><br>Batas<u>${e(pr.batas)}</u>Blusas Médicas<u>${e(pr.blusas)}</u></div>
+      <div class="camisas">${svgCamisa(false)}${svgCamisa(true)}</div>
+    </div>
+    <div class="der2">${abc(b, p.descripcion)}</div>
+  </div>
+
+  <div class="sec">
+    <div class="izq"><div class="otros"><h5>Otros Productos</h5><div>${e(o.producto)}</div></div></div>
+    <div class="der2">${abc(o)}</div>
+  </div>
+
+  <div class="sec" style="margin-top:12px;">
+    <div style="width:70%;">
+      <table class="t">
+        <thead><tr><th style="width:52px;">Cant.</th><th>Descripción</th><th style="width:92px;">Unidad</th><th style="width:100px;">Total</th></tr></thead>
+        <tbody>${filas.join('')}</tbody>
+        <tfoot><tr><td colspan="2" style="font-size:10px;">ENTREGA: ${e(fmtCorta(p.fechaPromesa))}</td><td class="c" style="font-size:10px; font-weight:bold;">TOTAL $</td><td class="r"><b>${fmt(total)}</b></td></tr></tfoot>
+      </table>
+    </div>
+    <div class="colores"><h3>COLORES</h3><div>${e(p.colorHilos)}</div>${disenoTxt ? `<div style="font-size:10.5px; margin-top:10px; color:#555;">Diseño: ${disenoTxt}</div>` : ''}</div>
+  </div>
+
+  <div class="pago">
+    <div>Abonado<b>${fmt(abonado)}</b></div>
+    <div>Saldo pendiente<b>${fmt(saldo)}</b></div>
+    <div class="est">${estadoPagoTxt}${p.formaPago ? `&nbsp;&middot;&nbsp;<span style="font-weight:normal">${e(p.formaPago)}</span>` : ''}</div>
+  </div>
+
+  <div class="dir">Dirección: Cra. 45 #49-81 Edif. Copal Int. 201 Medellín-Antioquia<br>Telf.: 301 4395038 &middot; ${e(NEGOCIO.web)}</div>
+  <div class="pie">Documento interno de orden de pedido. No reemplaza la factura electrónica.${NEGOCIO.nota ? ' ' + e(NEGOCIO.nota) : ''}</div>
+</body></html>`;
+}
+function imprimirOrden(p){
+  const tituloAnterior = document.title;
+  document.title = 'Orden ' + (p.recibo || 'S-N') + ' - ' + p.cliente;   // sugiere este nombre al guardar el PDF
+  const f = document.createElement('iframe');
+  f.setAttribute('aria-hidden', 'true');
+  f.style.cssText = 'position:fixed; right:0; bottom:0; width:0; height:0; border:0; visibility:hidden;';
+  document.body.appendChild(f);
+  const doc = f.contentDocument;
+  doc.open(); doc.write(ordenHtml(p)); doc.close();
+  let limpio = false;
+  const limpiar = () => {
+    if(limpio) return;
+    limpio = true;
+    document.title = tituloAnterior;
+    setTimeout(() => f.remove(), 500);
+  };
+  const lanzar = () => {
+    try{
+      f.contentWindow.addEventListener('afterprint', limpiar);
+      f.contentWindow.focus();
+      f.contentWindow.print();
+    }catch(e){ console.error(e); limpiar(); }
+  };
+  const imgs = [...doc.images];
+  Promise.all(imgs.map(i => (i.decode ? i.decode().catch(() => {}) : Promise.resolve())))
+    .then(() => setTimeout(lanzar, 150));
+  setTimeout(limpiar, 300000);
+}
 
 loadAll();
 </script>
