@@ -210,6 +210,9 @@
   .hl-date{display:block; font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--gold); margin-bottom:2px;}
 
   .hist-filter{display:flex; gap:8px; align-items:center; margin-bottom:16px; flex-wrap:wrap;}
+  .hist-sem{display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:13px; color:var(--ink-soft);}
+  .hist-nav{border:1px solid var(--line); background:#fff; border-radius:6px; padding:6px 9px; cursor:pointer; font-size:11px; color:var(--ink);}
+  .hist-sem-label{font-weight:500; color:var(--ink);}
   .hist-filter select, .hist-filter input{font-size:13px; padding:7px 9px; border:1px solid var(--line); border-radius:6px;}
   .hist-row{
     display:grid; grid-template-columns:1fr 90px 110px 100px 90px; gap:10px; align-items:center;
@@ -597,10 +600,21 @@
         <select id="histMode">
           <option value="todo">Todo</option>
           <option value="dia">Día</option>
+          <option value="semana">Semana</option>
+          <option value="rango">Rango de fechas</option>
           <option value="mes">Mes</option>
           <option value="anio">Año</option>
         </select>
         <input type="date" id="histDia" style="display:none;" />
+        <span id="histSemanaWrap" class="hist-sem" style="display:none;">
+          <button type="button" class="hist-nav" id="histSemAnt" title="Semana anterior">&#9664;</button>
+          <input type="date" id="histSemana" title="Cualquier día de la semana que quieres ver" />
+          <button type="button" class="hist-nav" id="histSemSig" title="Semana siguiente">&#9654;</button>
+          <span id="histSemLabel" class="hist-sem-label"></span>
+        </span>
+        <span id="histRangoWrap" class="hist-sem" style="display:none;">
+          Desde <input type="date" id="histDesde" /> Hasta <input type="date" id="histHasta" />
+        </span>
         <input type="month" id="histMes" style="display:none;" />
         <input type="number" id="histAnio" placeholder="2026" style="display:none; width:90px;" />
       </div>
@@ -1187,14 +1201,43 @@ function renderActive(irAlActual){
   }
 }
 
+function limitesSemana(fecha){
+  if(!fecha) return null;
+  const d = parseDia(fecha), w = (d.getDay() + 6) % 7;
+  const lun = new Date(d); lun.setDate(d.getDate() - w);
+  const dom = new Date(lun); dom.setDate(lun.getDate() + 6);
+  return {lun: ymdDe(lun), dom: ymdDe(dom), lunD: lun, domD: dom};
+}
+function etiquetaSemana(){
+  const sem = limitesSemana(document.getElementById('histSemana').value);
+  const el = document.getElementById('histSemLabel');
+  if(!sem){ el.textContent = ''; return; }
+  const f = (x) => x.toLocaleDateString('es-CO', {day:'numeric', month:'short'});
+  el.textContent = 'Lunes ' + f(sem.lunD) + ' al domingo ' + f(sem.domD) + ' de ' + sem.domD.getFullYear();
+}
+function moverSemana(n){
+  const inp = document.getElementById('histSemana');
+  const sem = limitesSemana(inp.value || todayStr());
+  const d = new Date(sem.lunD); d.setDate(d.getDate() + 7 * n);
+  inp.value = ymdDe(d);
+  renderHistory();
+}
 function renderHistory(){
   const mode = document.getElementById('histMode').value;
+  etiquetaSemana();
   let entregados = pedidos.filter(p => p.entregado && coincide(p));
   if(busqueda.trim()){
     // buscando: se ignoran los filtros de fecha
   }else if(mode === 'dia'){
     const d = document.getElementById('histDia').value;
     if(d) entregados = entregados.filter(p => p.fechaEntregaReal === d);
+  }else if(mode === 'semana'){
+    const sem = limitesSemana(document.getElementById('histSemana').value);
+    if(sem) entregados = entregados.filter(p => p.fechaEntregaReal && p.fechaEntregaReal >= sem.lun && p.fechaEntregaReal <= sem.dom);
+  }else if(mode === 'rango'){
+    const d1 = document.getElementById('histDesde').value, d2 = document.getElementById('histHasta').value;
+    if(d1) entregados = entregados.filter(p => p.fechaEntregaReal && p.fechaEntregaReal >= d1);
+    if(d2) entregados = entregados.filter(p => p.fechaEntregaReal && p.fechaEntregaReal <= d2);
   }else if(mode === 'mes'){
     const m = document.getElementById('histMes').value;
     if(m) entregados = entregados.filter(p => (p.fechaEntregaReal || '').slice(0,7) === m);
@@ -1521,9 +1564,15 @@ document.getElementById('histMode').addEventListener('change', (e) => {
   document.getElementById('histDia').style.display = e.target.value === 'dia' ? 'inline-block' : 'none';
   document.getElementById('histMes').style.display = e.target.value === 'mes' ? 'inline-block' : 'none';
   document.getElementById('histAnio').style.display = e.target.value === 'anio' ? 'inline-block' : 'none';
+  document.getElementById('histSemanaWrap').style.display = e.target.value === 'semana' ? 'inline-flex' : 'none';
+  document.getElementById('histRangoWrap').style.display = e.target.value === 'rango' ? 'inline-flex' : 'none';
+  if(e.target.value === 'semana' && !document.getElementById('histSemana').value) document.getElementById('histSemana').value = todayStr();
   renderHistory();
 });
 document.getElementById('histDia').addEventListener('input', renderHistory);
+['histSemana','histDesde','histHasta'].forEach(id => document.getElementById(id).addEventListener('input', renderHistory));
+document.getElementById('histSemAnt').addEventListener('click', () => moverSemana(-1));
+document.getElementById('histSemSig').addEventListener('click', () => moverSemana(1));
 document.getElementById('histMes').addEventListener('input', renderHistory);
 document.getElementById('histAnio').addEventListener('input', renderHistory);
 
