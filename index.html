@@ -374,6 +374,13 @@
   .thumb-wrap{position:relative; display:inline-block;}
   .thumb-x{position:absolute; top:-5px; right:-5px; width:18px; height:18px; border:none; border-radius:50%; background:rgba(0,0,0,.65); color:#fff; cursor:pointer; line-height:1; font-size:13px; padding:0;}
   .img-card-add{cursor:pointer; display:inline-block;}
+  .file-list, .order-files{display:flex; flex-wrap:wrap; gap:6px; margin:6px 0;}
+  .file-chip{display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:20px; background:#fff; font-size:12px;}
+  .file-chip small{color:var(--ink-soft);}
+  .file-dl, .file-nm{border:none; background:none; padding:4px 4px 4px 10px; font:inherit; color:var(--ink); cursor:pointer;}
+  .file-nm{cursor:default;}
+  .file-x, .chip-x{border:none; background:none; color:var(--ink-soft); cursor:pointer; padding:2px 9px 2px 4px; font-size:15px; line-height:1;}
+  .order-files{margin:8px 0;}
   .thumb-ver{width:64px; height:64px; object-fit:cover; border-radius:8px; border:1px solid var(--line); cursor:zoom-in; background:#fff;}
   #lightbox{position:fixed; inset:0; background:rgba(0,0,0,.82); display:flex; align-items:center; justify-content:center; z-index:9999; cursor:zoom-out;}
   #lightbox img{max-width:92vw; max-height:92vh; border-radius:8px; background:#fff;}
@@ -481,6 +488,7 @@
           <div class="full items-box" id="fItemsBox"></div>
           <div class="full tal-box" id="fTalBox"></div>
           <div class="full img-box" id="fImgBox"></div>
+          <div class="full img-box file-box" id="fFileBox"></div>
           <datalist id="catList"></datalist>
           <div>
             <label>Cantidad total de prendas / bordados</label>
@@ -786,6 +794,7 @@ async function loadAll(){
   await imgCargarTodo();
   await cargarCatalogo();
   iniciarImgForm();
+  iniciarFileForm();
   iniciarItemsForm();
   iniciarTalForm();
   sugerirRecibo();
@@ -954,6 +963,7 @@ function renderEditForm(p){
         <div class="full items-box">${itemsEditorHtml(p.items)}</div>
         <div class="full tal-box">${talBoxHtml(p.tal, tieneTal(p.tal))}</div>
         <div class="full img-box">${imgBoxHtml(editImgs)}</div>
+        <div class="full img-box file-box">${fileBoxHtml(editFiles)}</div>
         <div><label>Valor del pedido</label><input type="number" step="0.01" class="edit-input${(p.items&&p.items.length)?' auto-calc':''}" data-field="monto" value="${p.monto||0}" ${(p.items&&p.items.length)?'readonly':''} /></div>
         <div><label>Cantidad de prendas</label><input type="number" min="1" step="1" class="edit-input${(p.items&&p.items.length)?' auto-calc':''}" data-field="cantidad" value="${p.cantidad||1}" ${(p.items&&p.items.length)?'readonly':''} /></div>
         <div><label>Forma de pago</label>
@@ -1082,6 +1092,7 @@ function renderActive(irAlActual){
       ${p.descripcion ? `<div class="order-work"><span class="work-label">Trabajo</span>${escapeHtml(p.descripcion)}</div>` : ''}
       ${p.colorHilos ? `<div class="order-work"><span class="work-label">Color de hilos</span>${escapeHtml(p.colorHilos)}</div>` : ''}
       ${(imgCache[p.id] || []).length ? `<div class="order-imgs">${imgCache[p.id].map((u, i) => `<span class="thumb-wrap"><img class="thumb-ver" src="${u}" data-i="${i}" alt="Diseño ${i + 1}" title="Clic para ampliar"><button type="button" class="thumb-x" data-i="${i}" title="Quitar imagen">&times;</button></span>`).join('')}</div>` : ''}
+      ${(fileCache[p.id] || []).length ? `<div class="order-files">${filesChipsHtml(fileCache[p.id], 'card')}</div>` : ''}
       <div class="badges">${badges.join('')}</div>
       <div class="order-actions">
         <div class="field-group">
@@ -1108,6 +1119,7 @@ function renderActive(irAlActual){
         <label class="action-check"><input type="checkbox" class="chk-deliver" ${p.entregado ? 'checked' : ''} /> Entregado</label>
         ${p.facturaElec ? `<label class="action-check"><input type="checkbox" class="chk-factura" ${p.facturaEmitida ? 'checked' : ''} /> Factura emitida</label>` : ''}
         ${(imgCache[p.id] || []).length < IMG_MAX ? `<label class="del-btn img-card-add" title="Cargar la imagen del logo o diseño a bordar">+ Imagen<input type="file" accept="image/*" multiple class="img-card-input" style="display:none" /></label>` : ''}
+        ${(fileCache[p.id] || []).length < FILE_MAX ? `<label class="del-btn img-card-add" title="Cargar el archivo de bordado (.EMB de Wilcom, etc.)">+ Archivo<input type="file" multiple class="file-card-input" style="display:none" /></label>` : ''}
         <button class="del-btn print-orden" title="Generar la orden de pedido en PDF o imprimirla">Orden PDF</button>
         <button class="del-btn edit-pedido" title="Editar pedido">Editar</button>
         <button class="del-btn toggle-history" title="Ver historial de cambios">${openHistoryIds.has(p.id) ? 'Ocultar historial' : 'Historial'}</button>
@@ -1253,6 +1265,7 @@ function registrarPedido(){
   logChange(nuevoPedido, `Pedido registrado: cliente ${cliente}, ${cantidad} prenda(s), valor ${fmt(monto)}, promesa ${fechaPromesa}, estado ${ESTADO_LABEL[estado]}.`);
   pedidos.unshift(nuevoPedido);
   if(formImgs.length) imgGuardar(nuevoPedido.id, formImgs.slice());
+  if(formFiles.length) fileGuardar(nuevoPedido.id, formFiles.slice());
   const n = numRecibo(recibo);
   if(n > 0){ ultimoRecibo = n; guardarUltimoRecibo(); }
   ['fCliente','fCelular','fRecibo','fMonto','fPromesa','fCantidad','fColorHilos','fDescripcion','fMontoAbonado'].forEach(id => document.getElementById(id).value = '');
@@ -1261,6 +1274,7 @@ function registrarPedido(){
   document.getElementById('fYaTieneDiseno').checked = false;
   document.getElementById('fFacElec').checked = false;
   iniciarImgForm();
+  iniciarFileForm();
   document.getElementById('fPrioridad').value = 'media';
   document.getElementById('fEstado').value = 'diseno';
   document.getElementById('fEstadoPago').value = 'pendiente';
@@ -1314,7 +1328,7 @@ document.getElementById('ordersList').addEventListener('click', (e) => {
     return;
   }
   if(e.target.classList.contains('del-pedido')){
-    imgGuardar(id, []);
+    imgGuardar(id, []); fileGuardar(id, []);
     pedidos = pedidos.filter(p => p.id !== id);
     render();
     savePedidos();
@@ -1322,6 +1336,7 @@ document.getElementById('ordersList').addEventListener('click', (e) => {
   if(e.target.classList.contains('edit-pedido')){
     editingId = id;
     editImgs = (imgCache[id] || []).slice();
+    editFiles = (fileCache[id] || []).slice();
     renderActive();
   }
   if(e.target.classList.contains('cancel-edit')){
@@ -1365,6 +1380,10 @@ document.getElementById('ordersList').addEventListener('click', (e) => {
     }
     if(card.querySelector('.img-box')){
       if(JSON.stringify(imgCache[id] || []) !== JSON.stringify(editImgs)){ cambios.push('Imágenes del diseño actualizadas (' + editImgs.length + ').'); imgGuardar(id, editImgs.slice()); }
+    }
+    if(card.querySelector('.file-box')){
+      const meta = (a) => JSON.stringify((a || []).map(f => [f.name, f.size]));
+      if(meta(fileCache[id]) !== meta(editFiles)){ cambios.push('Archivos de bordado actualizados (' + editFiles.length + ').'); fileGuardar(id, editFiles.slice()); }
     }
     if(p.estadoPago === 'completo') p.montoAbonado = p.monto;
     if(cambios.length){
@@ -1511,7 +1530,7 @@ document.getElementById('syncNowBtn').addEventListener('click', () => {
 });
 
 document.getElementById('downloadBackupBtn').addEventListener('click', () => {
-  const data = {pedidos, metaDiaria, imagenes: imgCache, exportadoEl: new Date().toISOString()};
+  const data = {pedidos, metaDiaria, imagenes: imgCache, archivos: archivosParaBackup(), exportadoEl: new Date().toISOString()};
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1542,6 +1561,7 @@ document.getElementById('restoreFile').addEventListener('change', (e) => {
       document.getElementById('confirmRestoreBtn').addEventListener('click', async () => {
         pedidos = pendingRestore.pedidos || [];
         Object.keys(pendingRestore.imagenes || {}).forEach(k => imgGuardar(k, pendingRestore.imagenes[k]));
+        archivosDesdeBackup(pendingRestore.archivos);
         metaDiaria = pendingRestore.metaDiaria || 60;
         document.getElementById('metaDiaria').value = metaDiaria;
         await savePedidos();
@@ -1580,14 +1600,15 @@ const NEGOCIO = {
 };
 
 // ---------- Número consecutivo ----------
+const RECIBO_INICIAL = 213;   // la numeración arranca en 0213
 let ultimoRecibo = 0;
 function numRecibo(r){
   const m = String(r || '').match(/\d+/g);
   return m ? parseInt(m[m.length - 1], 10) : 0;
 }
 function siguienteRecibo(){
-  let base = ultimoRecibo;
-  if(!base) base = pedidos.length ? numRecibo(pedidos[0].recibo) : 0;
+  let base = Math.max(ultimoRecibo, RECIBO_INICIAL - 1);
+  pedidos.forEach(p => { base = Math.max(base, numRecibo(p.recibo)); });
   const ancho = Math.max(4, String(base).length);
   return String(base + 1).padStart(ancho, '0');
 }
@@ -1730,7 +1751,7 @@ const CAT_DEFAULT = [
   {n:'Bordado PC nombre y profesión + símbolo', t:[[1,18000]]},
   {n:'Bordado apliques misión médica y estrella de la vida (par)', t:[[1,18000]]},
   {n:'Pines', t:[[1,15000]]},
-  {n:'Clínica Soma + profesión', t:[[1,18000],[6,15000],[12,13000]]},
+  {n:'Logo institucional + profesión', t:[[1,18000],[6,15000],[12,13000]]},
   {n:'Promedan bata (v)', t:[[1,18000],[6,13000]]},
   {n:'Promedan manga', t:[[1,15000],[6,13000]]}
 ];
@@ -1797,7 +1818,7 @@ async function cargarCatalogo(){
     const c = await window.storage.get('catalogo');
     if(c){
       const o = JSON.parse(c.value);
-      if(o && o.v === CAT_VERSION && Array.isArray(o.items) && o.items.length) catalogo = o.items;
+      if(o && o.v === CAT_VERSION && Array.isArray(o.items) && o.items.length) catalogo = o.items.map(x => x.n === 'Clínica Soma + profesión' ? Object.assign({}, x, {n: 'Logo institucional + profesión'}) : x);
     }
   }catch(e){}
   renderCatalogo();
@@ -1870,8 +1891,12 @@ let editImgs = [];
 function imgAbrir(){
   return new Promise(res => {
     try{
-      const rq = indexedDB.open('roraima-imagenes', 1);
-      rq.onupgradeneeded = () => rq.result.createObjectStore('imgs');
+      const rq = indexedDB.open('roraima-imagenes', 2);
+      rq.onupgradeneeded = () => {
+        const db = rq.result;
+        if(!db.objectStoreNames.contains('imgs')) db.createObjectStore('imgs');
+        if(!db.objectStoreNames.contains('files')) db.createObjectStore('files');
+      };
       rq.onsuccess = () => res(rq.result);
       rq.onerror = () => res(null);
     }catch(e){ res(null); }
@@ -1884,6 +1909,13 @@ async function imgCargarTodo(){
     try{
       const rq = imgDB.transaction('imgs', 'readonly').objectStore('imgs').openCursor();
       rq.onsuccess = () => { const c = rq.result; if(c){ imgCache[c.key] = c.value; c.continue(); } else res(); };
+      rq.onerror = () => res();
+    }catch(e){ res(); }
+  });
+  await new Promise(res => {
+    try{
+      const rq = imgDB.transaction('files', 'readonly').objectStore('files').openCursor();
+      rq.onsuccess = () => { const c = rq.result; if(c){ fileCache[c.key] = c.value; c.continue(); } else res(); };
       rq.onerror = () => res();
     }catch(e){ res(); }
   });
@@ -1970,6 +2002,108 @@ function iniciarImgForm(){
       lb.innerHTML = `<img src="${e.target.src}" alt="">`;
       lb.addEventListener('click', () => lb.remove());
       document.body.appendChild(lb);
+    }
+  });
+})();
+
+// ---------- Archivos de bordado (.EMB de Wilcom, .DST, etc.): se guardan en este navegador (IndexedDB) ----------
+const FILE_MAX = 6, FILE_MAX_BYTES = 15 * 1024 * 1024;
+const fileCache = {};   // id del pedido -> [{name, size, data(ArrayBuffer)}]
+let formFiles = [];
+let editFiles = [];
+function fileGuardar(id, arr){
+  if(arr && arr.length) fileCache[id] = arr; else delete fileCache[id];
+  if(!imgDB) return;
+  try{
+    const st = imgDB.transaction('files', 'readwrite').objectStore('files');
+    if(arr && arr.length) st.put(arr, id); else st.delete(id);
+  }catch(e){ console.error(e); }
+}
+function fmtTam(n){ return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+function filesChipsHtml(arr, modo){
+  return (arr || []).map((f, i) => modo === 'card'
+    ? `<span class="file-chip"><button type="button" class="file-dl" data-i="${i}" title="Descargar">📎 ${escapeHtml(f.name)} <small>(${fmtTam(f.size)})</small></button><button type="button" class="chip-x" data-i="${i}" title="Quitar archivo">&times;</button></span>`
+    : `<span class="file-chip"><span class="file-nm">📎 ${escapeHtml(f.name)} <small>(${fmtTam(f.size)})</small></span><button type="button" class="file-x" data-i="${i}" title="Quitar archivo">&times;</button></span>`).join('');
+}
+function fileBoxHtml(arr){
+  return `<div class="img-title">Archivos de bordado: .EMB de Wilcom u otros (opcional, hasta ${FILE_MAX})</div>
+    <div class="file-list">${filesChipsHtml(arr, 'form')}</div>
+    <label class="it-add img-add">+ Agregar archivo<input type="file" multiple class="file-input" style="display:none" /></label>`;
+}
+function iniciarFileForm(){
+  formFiles = [];
+  document.getElementById('fFileBox').innerHTML = fileBoxHtml([]);
+}
+async function leerArchivos(files, arr){
+  const avisos = [];
+  for(const f of [...files]){
+    if(arr.length >= FILE_MAX){ avisos.push('Máximo ' + FILE_MAX + ' archivos por pedido.'); break; }
+    if(f.size > FILE_MAX_BYTES){ avisos.push(f.name + ' pesa más de 15 MB.'); continue; }
+    try{ arr.push({name: f.name, size: f.size, data: await f.arrayBuffer()}); }catch(e){ console.error(e); }
+  }
+  if(avisos.length) alert(avisos.join('\n'));
+}
+function descargarArchivo(f){
+  const url = URL.createObjectURL(new Blob([f.data], {type: 'application/octet-stream'}));
+  const a = document.createElement('a');
+  a.href = url; a.download = f.name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+function bufB64(buf){
+  const b = new Uint8Array(buf); let s = '';
+  for(let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+function b64Buf(b64){
+  const s = atob(b64), b = new Uint8Array(s.length);
+  for(let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
+  return b.buffer;
+}
+function archivosParaBackup(){
+  const o = {};
+  Object.keys(fileCache).forEach(id => { o[id] = fileCache[id].map(f => ({name: f.name, size: f.size, b64: bufB64(f.data)})); });
+  return o;
+}
+function archivosDesdeBackup(o){
+  Object.keys(o || {}).forEach(id => fileGuardar(id, o[id].map(f => ({name: f.name, size: f.size, data: b64Buf(f.b64)}))));
+}
+(function(){
+  const arrDe = (box) => box.id === 'fFileBox' ? formFiles : editFiles;
+  const refrescar = (box) => { box.querySelector('.file-list').innerHTML = filesChipsHtml(arrDe(box), 'form'); };
+  document.addEventListener('change', async (e) => {
+    if(e.target.classList.contains('file-input')){
+      const box = e.target.closest('.file-box');
+      await leerArchivos(e.target.files, arrDe(box));
+      e.target.value = ''; refrescar(box);
+    }
+    if(e.target.classList.contains('file-card-input')){
+      const card = e.target.closest('.order-card'); if(!card) return;
+      const id = card.dataset.id, arr = (fileCache[id] || []).slice();
+      await leerArchivos(e.target.files, arr);
+      fileGuardar(id, arr);
+      const p = pedidos.find(x => x.id === id);
+      if(p){ logChange(p, 'Archivo de bordado agregado (' + arr.length + ').'); savePedidos(); }
+      render();
+    }
+  });
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    if(t.classList.contains('file-x')){
+      const box = t.closest('.file-box');
+      arrDe(box).splice(parseInt(t.dataset.i), 1); refrescar(box);
+    }
+    const card = t.closest('.order-card');
+    if(t.classList.contains('file-dl') && card){
+      const f = (fileCache[card.dataset.id] || [])[parseInt(t.dataset.i)];
+      if(f) descargarArchivo(f);
+    }
+    if(t.classList.contains('chip-x') && card){
+      const id = card.dataset.id, arr = (fileCache[id] || []).slice();
+      arr.splice(parseInt(t.dataset.i), 1); fileGuardar(id, arr);
+      const p = pedidos.find(x => x.id === id);
+      if(p){ logChange(p, 'Archivo de bordado quitado (' + arr.length + ').'); savePedidos(); }
+      render();
     }
   });
 })();
