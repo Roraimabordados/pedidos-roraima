@@ -1367,7 +1367,11 @@ document.getElementById('fCrearDiseno').addEventListener('change', (e) => {
   lineaDiseno(document.getElementById('fItemsBox'), e.target.checked); aplicarItemsForm();
 });
 document.getElementById('fYaTieneDiseno').addEventListener('change', (e) => {
-  if(e.target.checked) document.getElementById('fCrearDiseno').checked = false;
+  if(e.target.checked){
+    document.getElementById('fCrearDiseno').checked = false;
+    // si "Crear diseño" había agregado la línea "Diseño nuevo", se quita (ya tiene diseño: no se cobra)
+    lineaDiseno(document.getElementById('fItemsBox'), false); aplicarItemsForm();
+  }
 });
 document.getElementById('fEstadoPago').addEventListener('change', (e) => {
   document.getElementById('fAbonoWrap').style.display = e.target.value === 'abona' ? 'block' : 'none';
@@ -1469,6 +1473,8 @@ document.getElementById('ordersList').addEventListener('change', (e) => {
   }
   if(e.target.classList.contains('edit-ya-diseno') && e.target.checked){
     card.querySelector('.edit-crear-diseno').checked = false;
+    const bi2 = card.querySelector('.items-box');
+    if(bi2 && p.items && p.items.length){ lineaDiseno(bi2, false); aplicarItemsEdit(bi2); }
   }
   if(e.target.classList.contains('sel-estado')){
     const antes = ESTADO_LABEL[p.estado];
