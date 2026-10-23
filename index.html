@@ -363,10 +363,29 @@
   }
   .btn-sec:hover{background:var(--gold-light);}
   .hist-btns{display:flex; flex-direction:column; gap:4px;}
+  .img-box{border:1px dashed #DDC9AE; border-radius:8px; padding:8px 10px; background:#FEFCF8;}
+  .img-title{font-size:11px; color:var(--bronze-dark); font-weight:500;}
+  .img-thumbs{display:flex; gap:8px; flex-wrap:wrap; margin:6px 0;}
+  .img-th{position:relative; width:84px; height:84px; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#fff;}
+  .img-th img{width:100%; height:100%; object-fit:cover; display:block;}
+  .img-del{position:absolute; top:2px; right:2px; width:20px; height:20px; border:none; border-radius:50%; background:rgba(0,0,0,.6); color:#fff; cursor:pointer; line-height:1; font-size:14px; padding:0;}
+  .img-add{display:inline-block; cursor:pointer;}
+  .order-imgs{display:flex; gap:6px; flex-wrap:wrap; margin:8px 0;}
+  .thumb-wrap{position:relative; display:inline-block;}
+  .thumb-x{position:absolute; top:-5px; right:-5px; width:18px; height:18px; border:none; border-radius:50%; background:rgba(0,0,0,.65); color:#fff; cursor:pointer; line-height:1; font-size:13px; padding:0;}
+  .img-card-add{cursor:pointer; display:inline-block;}
+  .thumb-ver{width:64px; height:64px; object-fit:cover; border-radius:8px; border:1px solid var(--line); cursor:zoom-in; background:#fff;}
+  #lightbox{position:fixed; inset:0; background:rgba(0,0,0,.82); display:flex; align-items:center; justify-content:center; z-index:9999; cursor:zoom-out;}
+  #lightbox img{max-width:92vw; max-height:92vh; border-radius:8px; background:#fff;}
+  .alert-box.fact{background:#E8EFF5; color:#35607F; border:1.5px solid #35607F;}
   .cat-box{border:1px dashed #DDC9AE; border-radius:8px; padding:8px 10px; background:#FEFCF8;}
   .cat-box summary{cursor:pointer; font-size:12px; font-weight:500; color:var(--bronze-dark);}
-  .cat-row{display:grid; grid-template-columns:1fr 1.1fr 32px; gap:6px; margin-top:6px;}
-  @media (max-width:560px){ .cat-row{grid-template-columns:1fr 32px;} .cat-row .cat-t{grid-column:1/-1; grid-row:2;} }
+  .cat-item{border-top:1px solid var(--line); padding:8px 0;}
+  .cat-head{display:grid; grid-template-columns:1fr 32px; gap:6px;}
+  .cat-tier{display:flex; align-items:center; gap:6px; margin-top:6px; font-size:12px; color:var(--ink-soft);}
+  .cat-tier input.cat-min{width:64px;}
+  .cat-tier input.cat-pr{width:120px;}
+  .cat-tier .it-del{height:30px; width:30px;}
   .tal-box{border:1px dashed #DDC9AE; border-radius:8px; padding:8px 10px; background:#FEFCF8;}
   .tal-det > summary{cursor:pointer; font-size:12px; font-weight:500; color:var(--bronze-dark); padding:2px 0;}
   .tal-top, .tal-prendas, .tal-med{display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin-top:8px;}
@@ -458,9 +477,10 @@
           </div>
           <div class="full cat-box"><details><summary>Lista de precios y servicios (editable)</summary>
             <div id="catRows"></div><button type="button" class="it-add" id="catAdd">+ Agregar servicio</button>
-            <p style="font-size:11px;color:var(--ink-soft);margin:6px 0 0;">Cada servicio tiene precio por cantidad: «desde cantidad : precio» (ej. 1:50100, 6:45250, 12:42500). Al escoger el servicio y la cantidad en el detalle, el valor se llena solo; siempre puedes cambiar cantidad y valor en cada pedido. Producciones grandes: primero el diseño y se cotiza aparte.</p></details></div>
+            <p style="font-size:11px;color:var(--ink-soft);margin:6px 0 0;">Cada servicio puede tener precios distintos según la cantidad (ej. desde 1 unidad $50.100, desde 6 unidades $45.250). Al escoger el servicio y la cantidad en el detalle, el valor se llena solo; siempre puedes cambiar cantidad y valor en cada pedido. Producciones grandes: primero el diseño y se cotiza aparte.</p></details></div>
           <div class="full items-box" id="fItemsBox"></div>
           <div class="full tal-box" id="fTalBox"></div>
+          <div class="full img-box" id="fImgBox"></div>
           <datalist id="catList"></datalist>
           <div>
             <label>Cantidad total de prendas / bordados</label>
@@ -512,6 +532,7 @@
           <div class="checks-row" style="align-items:center;">
             <label class="check-inline"><input type="checkbox" id="fCrearDiseno" /> Crear diseño</label>
             <label class="check-inline"><input type="checkbox" id="fYaTieneDiseno" /> Ya tiene diseño</label>
+            <label class="check-inline"><input type="checkbox" id="fFacElec" /> Requiere factura electrónica</label>
           </div>
         </div>
         <button class="btn-add" id="addBtn">Registrar pedido</button>
@@ -658,7 +679,7 @@ const FIELD_LABELS = {
   cantidad:'Cantidad de prendas', colorHilos:'Color de hilos', descripcion:'Descripción del trabajo',
   crearDiseno:'Crear diseño', yaTieneDiseno:'Ya tiene diseño',
   estado:'Estado del pedido', estadoPago:'Estado de pago', montoAbonado:'Monto abonado',
-  documento:'Cédula o NIT', formaPago:'Forma de pago'
+  documento:'Cédula o NIT', formaPago:'Forma de pago', facturaElec:'Requiere factura electrónica', facturaEmitida:'Factura electrónica emitida'
 };
 function logChange(p, texto){
   if(!p.historialCambios) p.historialCambios = [];
@@ -762,7 +783,9 @@ async function loadAll(){
     const u = await window.storage.get('ultimo-recibo');
     ultimoRecibo = u ? (parseInt(u.value) || 0) : 0;
   }catch(e){ ultimoRecibo = 0; }
+  await imgCargarTodo();
   await cargarCatalogo();
+  iniciarImgForm();
   iniciarItemsForm();
   iniciarTalForm();
   sugerirRecibo();
@@ -888,8 +911,14 @@ function renderAlerts(){
       <ul class="alert-list">${ready.map(p => `<li>${escapeHtml(p.cliente)} ${p.celular ? '('+escapeHtml(p.celular)+')' : ''} &mdash; recibo ${escapeHtml(p.recibo||'-')}</li>`).join('')}</ul>
     </div>`;
   }
+  const fact = pedidos.filter(p => p.facturaElec && !p.facturaEmitida);
+  if(fact.length){
+    html += `<div class="alert-box fact"><b>Factura electrónica pendiente de emitir (${fact.length})</b>
+      <ul class="alert-list">${fact.map(p => `<li>${escapeHtml(p.cliente)} &mdash; recibo ${escapeHtml(p.recibo||'-')}, ${fmt(p.monto)}${p.entregado ? ' (ya entregado)' : ''}</li>`).join('')}</ul>
+    </div>`;
+  }
   if(!html){
-    html = '<div class="alerts-empty">Sin avisos por ahora: no hay pedidos retrasados ni listos sin retirar.</div>';
+    html = '<div class="alerts-empty">Sin avisos por ahora: no hay pedidos retrasados, listos sin retirar ni facturas por emitir.</div>';
   }
   box.innerHTML = html;
 }
@@ -924,6 +953,7 @@ function renderEditForm(p){
         <div><label>Fecha de promesa</label><input type="date" class="edit-input" data-field="fechaPromesa" value="${p.fechaPromesa||''}" /></div>
         <div class="full items-box">${itemsEditorHtml(p.items)}</div>
         <div class="full tal-box">${talBoxHtml(p.tal, tieneTal(p.tal))}</div>
+        <div class="full img-box">${imgBoxHtml(editImgs)}</div>
         <div><label>Valor del pedido</label><input type="number" step="0.01" class="edit-input${(p.items&&p.items.length)?' auto-calc':''}" data-field="monto" value="${p.monto||0}" ${(p.items&&p.items.length)?'readonly':''} /></div>
         <div><label>Cantidad de prendas</label><input type="number" min="1" step="1" class="edit-input${(p.items&&p.items.length)?' auto-calc':''}" data-field="cantidad" value="${p.cantidad||1}" ${(p.items&&p.items.length)?'readonly':''} /></div>
         <div><label>Forma de pago</label>
@@ -936,6 +966,7 @@ function renderEditForm(p){
         <div class="checks-row">
           <label class="check-inline"><input type="checkbox" class="edit-input edit-crear-diseno" data-field="crearDiseno" ${p.crearDiseno?'checked':''} /> Crear diseño</label>
           <label class="check-inline"><input type="checkbox" class="edit-input edit-ya-diseno" data-field="yaTieneDiseno" ${p.yaTieneDiseno?'checked':''} /> Ya tiene diseño</label>
+          <label class="check-inline"><input type="checkbox" class="edit-input" data-field="facturaElec" ${p.facturaElec?'checked':''} /> Requiere factura electrónica</label>
         </div>
       </div>
       <div class="edit-actions">
@@ -1024,6 +1055,7 @@ function renderActive(irAlActual){
     badges.push(paymentBadge(p));
     if(p.crearDiseno) badges.push(`<span class="badge design-pending">Crear diseño</span>`);
     else if(p.yaTieneDiseno) badges.push(`<span class="badge pay-ok">Ya tiene diseño</span>`);
+    if(p.facturaElec) badges.push(p.facturaEmitida ? `<span class="badge pay-ok">Factura electrónica emitida</span>` : `<span class="badge pay-pending">Falta emitir factura electrónica</span>`);
 
     if(editingId === p.id){
       return `<div class="${cardClass}" data-id="${p.id}">
@@ -1049,6 +1081,7 @@ function renderActive(irAlActual){
       ${(p.items && p.items.length) ? `<div class="order-work"><span class="work-label">Detalle</span>${p.items.map(it => `${it.cant} &times; ${escapeHtml(it.desc || 'Bordado')} <span style="color:var(--ink-soft);">(${fmt(it.val)} c/u)</span>`).join('<br/>')}</div>` : ''}
       ${p.descripcion ? `<div class="order-work"><span class="work-label">Trabajo</span>${escapeHtml(p.descripcion)}</div>` : ''}
       ${p.colorHilos ? `<div class="order-work"><span class="work-label">Color de hilos</span>${escapeHtml(p.colorHilos)}</div>` : ''}
+      ${(imgCache[p.id] || []).length ? `<div class="order-imgs">${imgCache[p.id].map((u, i) => `<span class="thumb-wrap"><img class="thumb-ver" src="${u}" data-i="${i}" alt="Diseño ${i + 1}" title="Clic para ampliar"><button type="button" class="thumb-x" data-i="${i}" title="Quitar imagen">&times;</button></span>`).join('')}</div>` : ''}
       <div class="badges">${badges.join('')}</div>
       <div class="order-actions">
         <div class="field-group">
@@ -1073,6 +1106,8 @@ function renderActive(irAlActual){
           <input type="number" step="0.01" class="inp-abonado" value="${p.montoAbonado || 0}" />
         </div>` : ''}
         <label class="action-check"><input type="checkbox" class="chk-deliver" ${p.entregado ? 'checked' : ''} /> Entregado</label>
+        ${p.facturaElec ? `<label class="action-check"><input type="checkbox" class="chk-factura" ${p.facturaEmitida ? 'checked' : ''} /> Factura emitida</label>` : ''}
+        ${(imgCache[p.id] || []).length < IMG_MAX ? `<label class="del-btn img-card-add" title="Cargar la imagen del logo o diseño a bordar">+ Imagen<input type="file" accept="image/*" multiple class="img-card-input" style="display:none" /></label>` : ''}
         <button class="del-btn print-orden" title="Generar la orden de pedido en PDF o imprimirla">Orden PDF</button>
         <button class="del-btn edit-pedido" title="Editar pedido">Editar</button>
         <button class="del-btn toggle-history" title="Ver historial de cambios">${openHistoryIds.has(p.id) ? 'Ocultar historial' : 'Historial'}</button>
@@ -1148,11 +1183,12 @@ function renderHistory(){
   }else{
     list.innerHTML = entregados.map(p => `
       <div class="hist-row" data-id="${p.id}">
-        <span>${escapeHtml(p.cliente)}<br/><span style="color:var(--ink-soft); font-size:11px;">${p.cantidad || 0} prenda(s)</span></span>
+        <span>${escapeHtml(p.cliente)}<br/><span style="color:var(--ink-soft); font-size:11px;">${p.cantidad || 0} prenda(s)${p.facturaElec ? (p.facturaEmitida ? ' &middot; factura electrónica emitida' : ' &middot; <b style="color:var(--late)">falta factura electrónica</b>') : ''}</span></span>
         <span>${escapeHtml(p.recibo || '-')}</span>
         <span>${p.fechaEntregaReal || '-'}</span>
         <span class="hist-amount">${fmt(p.montoAbonado)}${restante(p) > 0 ? `<br/><span style="color:var(--late); font-weight:400; font-size:11px;">resta ${fmt(restante(p))}</span>` : ''}</span>
         <span class="hist-btns">
+          ${p.facturaElec && !p.facturaEmitida ? '<button class="hist-undo fac-h" title="Marcar la factura electrónica como emitida">Factura emitida</button>' : ''}
           <button class="hist-undo print-orden-h" title="Orden de pedido en PDF">Orden PDF</button>
           <button class="hist-undo undo-pedido" title="Regresar a pedidos activos">Deshacer</button>
         </span>
@@ -1210,18 +1246,21 @@ function registrarPedido(){
   err.style.display = 'none';
   const nuevoPedido = {
     id: uid(), cliente, celular, recibo, prioridad, fechaCreacion, fechaPromesa, monto, cantidad,
-    items, formaPago, tal: leerTal(document.getElementById('fTalBox')),
+    items, formaPago, facturaElec: document.getElementById('fFacElec').checked, facturaEmitida: false, tal: leerTal(document.getElementById('fTalBox')),
     estado, colorHilos, descripcion, crearDiseno, yaTieneDiseno, estadoPago, montoAbonado,
     entregado:false, fechaEntregaReal:null, historialCambios:[]
   };
   logChange(nuevoPedido, `Pedido registrado: cliente ${cliente}, ${cantidad} prenda(s), valor ${fmt(monto)}, promesa ${fechaPromesa}, estado ${ESTADO_LABEL[estado]}.`);
   pedidos.unshift(nuevoPedido);
+  if(formImgs.length) imgGuardar(nuevoPedido.id, formImgs.slice());
   const n = numRecibo(recibo);
   if(n > 0){ ultimoRecibo = n; guardarUltimoRecibo(); }
   ['fCliente','fCelular','fRecibo','fMonto','fPromesa','fCantidad','fColorHilos','fDescripcion','fMontoAbonado'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('fRecibo').dataset.auto = '';
   document.getElementById('fCrearDiseno').checked = false;
   document.getElementById('fYaTieneDiseno').checked = false;
+  document.getElementById('fFacElec').checked = false;
+  iniciarImgForm();
   document.getElementById('fPrioridad').value = 'media';
   document.getElementById('fEstado').value = 'diseno';
   document.getElementById('fEstadoPago').value = 'pendiente';
@@ -1275,12 +1314,14 @@ document.getElementById('ordersList').addEventListener('click', (e) => {
     return;
   }
   if(e.target.classList.contains('del-pedido')){
+    imgGuardar(id, []);
     pedidos = pedidos.filter(p => p.id !== id);
     render();
     savePedidos();
   }
   if(e.target.classList.contains('edit-pedido')){
     editingId = id;
+    editImgs = (imgCache[id] || []).slice();
     renderActive();
   }
   if(e.target.classList.contains('cancel-edit')){
@@ -1321,6 +1362,9 @@ document.getElementById('ordersList').addEventListener('click', (e) => {
     if(boxTal){
       const nt = leerTal(boxTal);
       if(JSON.stringify(nt) !== JSON.stringify(p.tal || {})){ p.tal = nt; cambios.push('Datos de la orden (prendas, ubicación, medidas) actualizados.'); }
+    }
+    if(card.querySelector('.img-box')){
+      if(JSON.stringify(imgCache[id] || []) !== JSON.stringify(editImgs)){ cambios.push('Imágenes del diseño actualizadas (' + editImgs.length + ').'); imgGuardar(id, editImgs.slice()); }
     }
     if(p.estadoPago === 'completo') p.montoAbonado = p.monto;
     if(cambios.length){
@@ -1375,6 +1419,11 @@ document.getElementById('ordersList').addEventListener('change', (e) => {
     if(antes !== p.fechaCreacion) logChange(p, `Fecha de recepción: "${antes||'-'}" → "${p.fechaCreacion||'-'}"`);
     savePedidos();
   }
+  if(e.target.classList.contains('chk-factura')){
+    p.facturaEmitida = e.target.checked;
+    logChange(p, p.facturaEmitida ? 'Factura electrónica marcada como emitida.' : 'Factura electrónica marcada como pendiente.');
+    render(); savePedidos();
+  }
   if(e.target.classList.contains('chk-deliver')){
     p.entregado = e.target.checked;
     if(p.entregado){
@@ -1416,6 +1465,14 @@ document.getElementById('historyList').addEventListener('click', (e) => {
     if(pp) imprimirOrden(pp);
     return;
   }
+  if(e.target.classList.contains('fac-h')){
+    const p = pedidos.find(x => x.id === row.dataset.id);
+    if(!p) return;
+    p.facturaEmitida = true;
+    logChange(p, 'Factura electrónica marcada como emitida.');
+    render(); savePedidos();
+    return;
+  }
   if(e.target.classList.contains('undo-pedido')){
     const p = pedidos.find(x => x.id === row.dataset.id);
     if(!p) return;
@@ -1454,7 +1511,7 @@ document.getElementById('syncNowBtn').addEventListener('click', () => {
 });
 
 document.getElementById('downloadBackupBtn').addEventListener('click', () => {
-  const data = {pedidos, metaDiaria, exportadoEl: new Date().toISOString()};
+  const data = {pedidos, metaDiaria, imagenes: imgCache, exportadoEl: new Date().toISOString()};
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1484,6 +1541,7 @@ document.getElementById('restoreFile').addEventListener('change', (e) => {
         <button id="cancelRestoreBtn">Cancelar</button>`;
       document.getElementById('confirmRestoreBtn').addEventListener('click', async () => {
         pedidos = pendingRestore.pedidos || [];
+        Object.keys(pendingRestore.imagenes || {}).forEach(k => imgGuardar(k, pendingRestore.imagenes[k]));
         metaDiaria = pendingRestore.metaDiaria || 60;
         document.getElementById('metaDiaria').value = metaDiaria;
         await savePedidos();
@@ -1678,7 +1736,7 @@ const CAT_DEFAULT = [
 ];
 let catalogo = JSON.parse(JSON.stringify(CAT_DEFAULT));
 function esDiseno(it){ return ((it && it.desc) || '').trim().toLowerCase() === NOMBRE_DISENO.toLowerCase(); }
-function tiersToText(t){ return (t || []).map(x => x[0] + ':' + x[1]).join(', '); }
+function tiersToText(t){ return (t || []).map(x => x[0] <= 1 ? String(x[1]) : x[0] + ':' + x[1]).join(', '); }
 function textToTiers(s){
   const out = [];
   (s || '').split(',').forEach(tok => {
@@ -1692,7 +1750,7 @@ function textToTiers(s){
   return out.sort((a, b) => a[0] - b[0]);
 }
 function precioTier(c, cant){
-  const t = (c && c.t) || [];
+  const t = ((c && c.t) || []).filter(x => x[1] > 0);
   if(!t.length) return null;
   let r = t[0][1];
   t.forEach(x => { if(cant >= x[0]) r = x[1]; });
@@ -1718,16 +1776,21 @@ function guardarCatalogo(){
 }
 function actualizarDatalist(){
   const dl = document.getElementById('catList');
-  if(dl) dl.innerHTML = catalogo.filter(c => c.n).map(c => `<option value="${escapeHtml(c.n)}" label="${escapeHtml(tiersToText(c.t))}"></option>`).join('');
+  if(dl) dl.innerHTML = catalogo.filter(c => c.n).map(c => `<option value="${escapeHtml(c.n)}"></option>`).join('');
 }
 function renderCatalogo(){
   actualizarDatalist();
   const box = document.getElementById('catRows');
   if(!box) return;
-  box.innerHTML = catalogo.map(c => `<div class="cat-row">
-    <input class="cat-n" placeholder="Servicio" value="${escapeHtml(c.n || '')}" />
-    <input class="cat-t" placeholder="desde cantidad : precio  (ej. 1:50100, 6:45250)" value="${escapeHtml(tiersToText(c.t))}" />
-    <button type="button" class="it-del cat-del" title="Quitar">&times;</button></div>`).join('');
+  box.innerHTML = catalogo.map(c => `<div class="cat-item">
+    <div class="cat-head"><input class="cat-n" placeholder="Servicio" value="${escapeHtml(c.n || '')}" />
+      <button type="button" class="it-del cat-del" title="Quitar este servicio">&times;</button></div>
+    ${(c.t && c.t.length ? c.t : [[1, '']]).map(t => `<div class="cat-tier"><span>Desde</span>
+      <input class="cat-min" type="number" min="1" step="1" value="${t[0]}" /><span>unidades</span>
+      <input class="cat-pr" type="number" min="0" step="100" placeholder="Precio c/u" value="${t[1] === '' ? '' : t[1]}" />
+      <button type="button" class="it-del cat-tdel" title="Quitar este rango">&times;</button></div>`).join('')}
+    <button type="button" class="it-add cat-tadd">+ Otro rango de cantidad</button>
+  </div>`).join('');
 }
 async function cargarCatalogo(){
   try{
@@ -1740,20 +1803,32 @@ async function cargarCatalogo(){
   renderCatalogo();
 }
 function leerCatalogoUI(){
-  catalogo = [...document.querySelectorAll('#catRows .cat-row')].map(r => ({
-    n: r.querySelector('.cat-n').value.trim(), t: textToTiers(r.querySelector('.cat-t').value)
-  })).filter(c => c.n);
+  catalogo = [...document.querySelectorAll('#catRows .cat-item')].map(it => ({
+    n: it.querySelector('.cat-n').value.trim(),
+    t: [...it.querySelectorAll('.cat-tier')].map(r => [parseInt(r.querySelector('.cat-min').value) || 1, parseFloat(r.querySelector('.cat-pr').value) || 0])
+        .sort((a, b) => a[0] - b[0])
+  }));
   guardarCatalogo(); actualizarDatalist();
 }
 (function(){
   const rows = document.getElementById('catRows');
   rows.addEventListener('input', leerCatalogoUI);
   rows.addEventListener('click', (e) => {
-    if(!e.target.classList.contains('cat-del')) return;
-    e.target.closest('.cat-row').remove(); leerCatalogoUI(); renderCatalogo();
+    const t = e.target, item = t.closest('.cat-item');
+    if(!item) return;
+    const i = [...rows.querySelectorAll('.cat-item')].indexOf(item);
+    if(t.classList.contains('cat-del')){ leerCatalogoUI(); catalogo.splice(i, 1); guardarCatalogo(); renderCatalogo(); }
+    else if(t.classList.contains('cat-tdel')){
+      const j = [...item.querySelectorAll('.cat-tier')].indexOf(t.closest('.cat-tier'));
+      leerCatalogoUI(); catalogo[i].t.splice(j, 1); guardarCatalogo(); renderCatalogo();
+    }else if(t.classList.contains('cat-tadd')){
+      leerCatalogoUI(); const ult = catalogo[i].t.length ? catalogo[i].t[catalogo[i].t.length - 1][0] : 0;
+      catalogo[i].t.push([ult + 5, 0]); renderCatalogo();
+      const cp = rows.querySelectorAll('.cat-item')[i].querySelectorAll('.cat-pr'); cp[cp.length - 1].focus();
+    }
   });
   document.getElementById('catAdd').addEventListener('click', () => {
-    catalogo.push({n:'', t:[]}); renderCatalogo();
+    leerCatalogoUI(); catalogo.push({n:'', t:[[1, 0]]}); renderCatalogo();
     const n = rows.querySelectorAll('.cat-n'); n[n.length - 1].focus();
   });
 })();
@@ -1785,6 +1860,119 @@ function lineaDiseno(box, on){
     if(!rows.querySelector('.it-row')) rows.insertAdjacentHTML('beforeend', itemRowHtml({}));
   }
 }
+
+// ---------- Imágenes del diseño a bordar (comprimidas, guardadas en este navegador con IndexedDB) ----------
+const IMG_MAX = 3;
+const imgCache = {};
+let imgDB = null;
+let formImgs = [];
+let editImgs = [];
+function imgAbrir(){
+  return new Promise(res => {
+    try{
+      const rq = indexedDB.open('roraima-imagenes', 1);
+      rq.onupgradeneeded = () => rq.result.createObjectStore('imgs');
+      rq.onsuccess = () => res(rq.result);
+      rq.onerror = () => res(null);
+    }catch(e){ res(null); }
+  });
+}
+async function imgCargarTodo(){
+  imgDB = await imgAbrir();
+  if(!imgDB) return;
+  await new Promise(res => {
+    try{
+      const rq = imgDB.transaction('imgs', 'readonly').objectStore('imgs').openCursor();
+      rq.onsuccess = () => { const c = rq.result; if(c){ imgCache[c.key] = c.value; c.continue(); } else res(); };
+      rq.onerror = () => res();
+    }catch(e){ res(); }
+  });
+}
+function imgGuardar(id, arr){
+  if(arr && arr.length) imgCache[id] = arr; else delete imgCache[id];
+  if(!imgDB) return;
+  try{
+    const st = imgDB.transaction('imgs', 'readwrite').objectStore('imgs');
+    if(arr && arr.length) st.put(arr, id); else st.delete(id);
+  }catch(e){ console.error(e); }
+}
+function comprimirImagen(file){
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = () => {
+      const k = Math.min(1, 800 / Math.max(im.naturalWidth, im.naturalHeight));
+      const w = Math.round(im.naturalWidth * k), h = Math.round(im.naturalHeight * k);
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h); cx.drawImage(im, 0, 0, w, h);
+      URL.revokeObjectURL(url); res(cv.toDataURL('image/jpeg', 0.78));
+    };
+    im.onerror = () => { URL.revokeObjectURL(url); rej(new Error('imagen no válida')); };
+    im.src = url;
+  });
+}
+function imgThumbsHtml(imgs){
+  return (imgs || []).map((u, i) => `<div class="img-th"><img src="${u}" alt=""><button type="button" class="img-del" data-i="${i}" title="Quitar">&times;</button></div>`).join('');
+}
+function imgBoxHtml(imgs){
+  return `<div class="img-title">Imagen del logo / diseño a bordar (opcional, hasta ${IMG_MAX})</div>
+    <div class="img-thumbs">${imgThumbsHtml(imgs)}</div>
+    <label class="it-add img-add">+ Agregar imagen<input type="file" accept="image/*" multiple class="img-input" style="display:none" /></label>`;
+}
+function iniciarImgForm(){
+  formImgs = [];
+  document.getElementById('fImgBox').innerHTML = imgBoxHtml([]);
+}
+(function(){
+  const arrDe = (box) => box.id === 'fImgBox' ? formImgs : editImgs;
+  const refrescar = (box) => { box.querySelector('.img-thumbs').innerHTML = imgThumbsHtml(arrDe(box)); };
+  document.addEventListener('change', async (e) => {
+    if(!e.target.classList.contains('img-input')) return;
+    const box = e.target.closest('.img-box'), arr = arrDe(box);
+    for(const f of [...e.target.files]){
+      if(arr.length >= IMG_MAX) break;
+      try{ arr.push(await comprimirImagen(f)); }catch(err){ console.error(err); }
+    }
+    e.target.value = '';
+    refrescar(box);
+  });
+  document.addEventListener('change', async (e) => {
+    if(!e.target.classList.contains('img-card-input')) return;
+    const card = e.target.closest('.order-card'); if(!card) return;
+    const id = card.dataset.id, arr = (imgCache[id] || []).slice();
+    for(const f of [...e.target.files]){
+      if(arr.length >= IMG_MAX) break;
+      try{ arr.push(await comprimirImagen(f)); }catch(err){ console.error(err); }
+    }
+    imgGuardar(id, arr);
+    const p = pedidos.find(x => x.id === id);
+    if(p){ logChange(p, 'Imagen del diseño agregada (' + arr.length + ').'); savePedidos(); }
+    render();
+  });
+  document.addEventListener('click', (e) => {
+    if(e.target.classList.contains('thumb-x')){
+      const card = e.target.closest('.order-card'); if(!card) return;
+      const id = card.dataset.id, arr = (imgCache[id] || []).slice();
+      arr.splice(parseInt(e.target.dataset.i), 1);
+      imgGuardar(id, arr);
+      const p = pedidos.find(x => x.id === id);
+      if(p){ logChange(p, 'Imagen del diseño quitada (' + arr.length + ').'); savePedidos(); }
+      render();
+      return;
+    }
+    if(e.target.classList.contains('img-del')){
+      const box = e.target.closest('.img-box');
+      arrDe(box).splice(parseInt(e.target.dataset.i), 1);
+      refrescar(box);
+    }
+    if(e.target.classList.contains('thumb-ver')){
+      const lb = document.createElement('div');
+      lb.id = 'lightbox';
+      lb.innerHTML = `<img src="${e.target.src}" alt="">`;
+      lb.addEventListener('click', () => lb.remove());
+      document.body.appendChild(lb);
+    }
+  });
+})();
 
 // ---------- Datos tipo talonario (prendas, ubicaciones A/B/C, medidas, otros productos) ----------
 function talInp(path, val, ph, cls, type){
@@ -1926,15 +2114,17 @@ function ordenHtml(p){
   .cant{position:relative; border:1px solid #333; border-radius:7px; height:24px; width:104px; margin:0 0 6px auto; text-align:center;}
   .cant span{position:absolute; top:-8px; left:50%; transform:translateX(-50%); background:#1d1d1d; color:#fff; font-size:9px; padding:1px 8px; border-radius:6px;}
   .cant b{line-height:24px; font-size:13px;}
-  .otros{border:1px solid #333; min-height:112px; padding:6px 8px;}
+  .otros{border:1px solid #333; border-radius:10px; min-height:112px; padding:6px 10px;}
   .otros h5{margin:0 0 4px; font-size:17px; font-weight:normal;}
   .otros div{font-size:12px; white-space:pre-wrap;}
   .med .v{max-width:60px;}
-  table.t{width:100%; border-collapse:collapse;}
-  table.t th{border:1px solid #333; font-size:9.5px; padding:5px 4px; font-weight:bold; text-transform:uppercase;}
-  table.t td{border:1px solid #333; padding:0 5px; height:23px; font-size:11.5px;}
+  table.t{width:100%; border-collapse:separate; border-spacing:0; border:1px solid #333; border-radius:10px; overflow:hidden;}
+  table.t th{border-right:1px solid #333; border-bottom:1px solid #333; font-size:9.5px; padding:5px 4px; font-weight:bold; text-transform:uppercase;}
+  table.t td{border-right:1px solid #333; border-bottom:1px solid #333; padding:0 5px; height:23px; font-size:11.5px;}
+  table.t th:last-child, table.t td:last-child{border-right:0;}
+  table.t tfoot td{border-bottom:0;}
   .c{text-align:center;} .r{text-align:right;}
-  .colores{width:30%;}
+  .colores{width:30%; border:1px solid #333; border-radius:10px; padding:8px 10px;}
   .colores h3{margin:0 0 6px; font-size:19px;}
   .colores div{font-size:13px; line-height:1.5; white-space:pre-wrap;}
   .pago{display:flex; gap:10px; margin-top:8px; align-items:stretch;}
@@ -1953,7 +2143,7 @@ function ordenHtml(p){
     </div>
   </div>
 
-  <div class="fila">${f('Señor (a):', p.cliente, 1)}</div>
+  <div class="fila" style="width:50%;">${f('Señor (a):', p.cliente, 1)}</div>
   <div class="fila">${f('Fecha de entrega:', fmtCorta(p.fechaPromesa), 1.3)}${f('Hora:', t.hora, 0.8)}${f('Tel.:', p.celular, 1.4)}</div>
 
   <div class="sec">
