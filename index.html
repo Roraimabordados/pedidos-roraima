@@ -1118,8 +1118,7 @@ function renderActive(irAlActual){
         </div>` : ''}
         <label class="action-check"><input type="checkbox" class="chk-deliver" ${p.entregado ? 'checked' : ''} /> Entregado</label>
         ${p.facturaElec ? `<label class="action-check"><input type="checkbox" class="chk-factura" ${p.facturaEmitida ? 'checked' : ''} /> Factura emitida</label>` : ''}
-        ${(imgCache[p.id] || []).length < IMG_MAX ? `<label class="del-btn img-card-add" title="Cargar la imagen del logo o diseño a bordar">+ Imagen<input type="file" accept="image/*" multiple class="img-card-input" style="display:none" /></label>` : ''}
-        ${(fileCache[p.id] || []).length < FILE_MAX ? `<label class="del-btn img-card-add" title="Cargar el archivo de bordado (.EMB de Wilcom, etc.)">+ Archivo<input type="file" multiple class="file-card-input" style="display:none" /></label>` : ''}
+        ${((imgCache[p.id] || []).length < IMG_MAX || (fileCache[p.id] || []).length < FILE_MAX) ? `<label class="del-btn img-card-add" title="Cargar la foto del logo o el archivo de bordado (.EMB de Wilcom, etc.)">+ Foto o archivo<input type="file" multiple class="img-card-input" style="display:none" /></label>` : ''}
         <button class="del-btn print-orden" title="Generar la orden de pedido en PDF o imprimirla">Orden PDF</button>
         <button class="del-btn edit-pedido" title="Editar pedido">Editar</button>
         <button class="del-btn toggle-history" title="Ver historial de cambios">${openHistoryIds.has(p.id) ? 'Ocultar historial' : 'Historial'}</button>
@@ -1957,29 +1956,6 @@ function iniciarImgForm(){
 (function(){
   const arrDe = (box) => box.id === 'fImgBox' ? formImgs : editImgs;
   const refrescar = (box) => { box.querySelector('.img-thumbs').innerHTML = imgThumbsHtml(arrDe(box)); };
-  document.addEventListener('change', async (e) => {
-    if(!e.target.classList.contains('img-input')) return;
-    const box = e.target.closest('.img-box'), arr = arrDe(box);
-    for(const f of [...e.target.files]){
-      if(arr.length >= IMG_MAX) break;
-      try{ arr.push(await comprimirImagen(f)); }catch(err){ console.error(err); }
-    }
-    e.target.value = '';
-    refrescar(box);
-  });
-  document.addEventListener('change', async (e) => {
-    if(!e.target.classList.contains('img-card-input')) return;
-    const card = e.target.closest('.order-card'); if(!card) return;
-    const id = card.dataset.id, arr = (imgCache[id] || []).slice();
-    for(const f of [...e.target.files]){
-      if(arr.length >= IMG_MAX) break;
-      try{ arr.push(await comprimirImagen(f)); }catch(err){ console.error(err); }
-    }
-    imgGuardar(id, arr);
-    const p = pedidos.find(x => x.id === id);
-    if(p){ logChange(p, 'Imagen del diseño agregada (' + arr.length + ').'); savePedidos(); }
-    render();
-  });
   document.addEventListener('click', (e) => {
     if(e.target.classList.contains('thumb-x')){
       const card = e.target.closest('.order-card'); if(!card) return;
@@ -2071,22 +2047,6 @@ function archivosDesdeBackup(o){
 (function(){
   const arrDe = (box) => box.id === 'fFileBox' ? formFiles : editFiles;
   const refrescar = (box) => { box.querySelector('.file-list').innerHTML = filesChipsHtml(arrDe(box), 'form'); };
-  document.addEventListener('change', async (e) => {
-    if(e.target.classList.contains('file-input')){
-      const box = e.target.closest('.file-box');
-      await leerArchivos(e.target.files, arrDe(box));
-      e.target.value = ''; refrescar(box);
-    }
-    if(e.target.classList.contains('file-card-input')){
-      const card = e.target.closest('.order-card'); if(!card) return;
-      const id = card.dataset.id, arr = (fileCache[id] || []).slice();
-      await leerArchivos(e.target.files, arr);
-      fileGuardar(id, arr);
-      const p = pedidos.find(x => x.id === id);
-      if(p){ logChange(p, 'Archivo de bordado agregado (' + arr.length + ').'); savePedidos(); }
-      render();
-    }
-  });
   document.addEventListener('click', (e) => {
     const t = e.target;
     if(t.classList.contains('file-x')){
@@ -2103,6 +2063,46 @@ function archivosDesdeBackup(o){
       arr.splice(parseInt(t.dataset.i), 1); fileGuardar(id, arr);
       const p = pedidos.find(x => x.id === id);
       if(p){ logChange(p, 'Archivo de bordado quitado (' + arr.length + ').'); savePedidos(); }
+      render();
+    }
+  });
+})();
+
+// ---------- Fotos y archivos se reparten solos: las imágenes quedan como imagen en la ficha; los demás (.EMB, .DST…) como archivo ----------
+const esImagenFile = (f) => /^image\//.test(f.type) || /\.(jpe?g|png|webp|gif|bmp)$/i.test(f.name);
+async function repartirArchivos(files, imgs, fls){
+  for(const f of [...files]){
+    if(esImagenFile(f) && imgs.length < IMG_MAX){
+      try{ imgs.push(await comprimirImagen(f)); continue; }catch(err){ /* formato que el navegador no abre (ej. HEIC): se guarda como archivo */ }
+    }
+    await leerArchivos([f], fls);
+  }
+}
+(function(){
+  document.addEventListener('change', async (e) => {
+    const t = e.target, c = t.classList;
+    if(c.contains('img-input') || c.contains('file-input')){
+      const box = t.closest('.img-box'), enForm = box.id === 'fImgBox' || box.id === 'fFileBox';
+      const imgs = enForm ? formImgs : editImgs, fls = enForm ? formFiles : editFiles;
+      await repartirArchivos(t.files, imgs, fls);
+      t.value = '';
+      const raiz = enForm ? document : box.closest('.edit-form');
+      raiz.querySelector(enForm ? '#fImgBox .img-thumbs' : '.img-box:not(.file-box) .img-thumbs').innerHTML = imgThumbsHtml(imgs);
+      raiz.querySelector(enForm ? '#fFileBox .file-list' : '.file-box .file-list').innerHTML = filesChipsHtml(fls, 'form');
+    }
+    if(c.contains('img-card-input')){
+      const card = t.closest('.order-card'); if(!card) return;
+      const id = card.dataset.id, imgs = (imgCache[id] || []).slice(), fls = (fileCache[id] || []).slice();
+      const ni = imgs.length, nf = fls.length;
+      await repartirArchivos(t.files, imgs, fls);
+      if(imgs.length !== ni) imgGuardar(id, imgs);
+      if(fls.length !== nf) fileGuardar(id, fls);
+      const p = pedidos.find(x => x.id === id);
+      if(p){
+        if(imgs.length !== ni) logChange(p, 'Imagen del diseño agregada (' + imgs.length + ').');
+        if(fls.length !== nf) logChange(p, 'Archivo de bordado agregado (' + fls.length + ').');
+        savePedidos();
+      }
       render();
     }
   });
