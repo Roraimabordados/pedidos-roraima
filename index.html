@@ -84,6 +84,14 @@
   .alert-box.late{background:var(--late-bg); color:var(--late); border:1.5px solid var(--late);}
   .alert-box.ready{background:var(--ready-bg); color:var(--ready); border:1.5px solid var(--ready);}
   .alert-list{margin:4px 0 0; padding-left:18px;}
+  .goto-pedido{color:inherit; text-decoration:underline; text-underline-offset:2px; cursor:pointer;}
+  .goto-pedido:hover{text-decoration-thickness:2px;}
+  .search-bar{margin:14px 0 4px;}
+  .search-bar input{width:100%;}
+  .busca-info{font-size:12px; color:var(--ink-soft); margin-top:6px; min-height:4px;}
+  .busca-tab{background:none; border:none; color:var(--bronze-dark); text-decoration:underline; cursor:pointer; font:inherit; padding:0;}
+  .flash{animation:flashCard 2.6s ease;}
+  @keyframes flashCard{0%,65%{box-shadow:0 0 0 3px #D4AF7A, 0 0 22px rgba(212,175,122,.9);} 100%{box-shadow:0 0 0 0 transparent;}}
   .alert-list li{margin-bottom:3px;}
   .alerts-empty{padding:10px 0 0; font-size:12px; color:var(--ink-soft); font-style:italic;}
 
@@ -442,6 +450,11 @@
         </div>
       </div>
       <div class="capacity-list" id="capacityList"></div>
+    </div>
+
+    <div class="search-bar">
+      <input id="buscar" type="search" placeholder="Buscar por nombre, celular o número de recibo…" autocomplete="off" />
+      <div class="busca-info" id="buscaInfo"></div>
     </div>
 
     <div class="tabs">
@@ -912,18 +925,18 @@ function renderAlerts(){
   let html = '';
   if(late.length){
     html += `<div class="alert-box late"><b>Retrasados (${late.length}) &mdash; contactar o priorizar</b>
-      <ul class="alert-list">${late.map(p => `<li>${escapeHtml(p.cliente)} &mdash; recibo ${escapeHtml(p.recibo||'-')}, ${daysLate(p)} día(s) de atraso</li>`).join('')}</ul>
+      <ul class="alert-list">${late.map(p => `<li><a href="#" class="goto-pedido" data-id="${p.id}">${escapeHtml(p.cliente)} &mdash; recibo ${escapeHtml(p.recibo||'-')}, ${daysLate(p)} día(s) de atraso</a></li>`).join('')}</ul>
     </div>`;
   }
   if(ready.length){
     html += `<div class="alert-box ready"><b>Listos, sin retirar (${ready.length}) &mdash; avisar al cliente</b>
-      <ul class="alert-list">${ready.map(p => `<li>${escapeHtml(p.cliente)} ${p.celular ? '('+escapeHtml(p.celular)+')' : ''} &mdash; recibo ${escapeHtml(p.recibo||'-')}</li>`).join('')}</ul>
+      <ul class="alert-list">${ready.map(p => `<li><a href="#" class="goto-pedido" data-id="${p.id}">${escapeHtml(p.cliente)} ${p.celular ? '('+escapeHtml(p.celular)+')' : ''} &mdash; recibo ${escapeHtml(p.recibo||'-')}</a></li>`).join('')}</ul>
     </div>`;
   }
   const fact = pedidos.filter(p => p.facturaElec && !p.facturaEmitida);
   if(fact.length){
     html += `<div class="alert-box fact"><b>Factura electrónica pendiente de emitir (${fact.length})</b>
-      <ul class="alert-list">${fact.map(p => `<li>${escapeHtml(p.cliente)} &mdash; recibo ${escapeHtml(p.recibo||'-')}, ${fmt(p.monto)}${p.entregado ? ' (ya entregado)' : ''}</li>`).join('')}</ul>
+      <ul class="alert-list">${fact.map(p => `<li><a href="#" class="goto-pedido" data-id="${p.id}">${escapeHtml(p.cliente)} &mdash; recibo ${escapeHtml(p.recibo||'-')}, ${fmt(p.monto)}${p.entregado ? ' (ya entregado)' : ''}</a></li>`).join('')}</ul>
     </div>`;
   }
   if(!html){
@@ -1049,9 +1062,9 @@ function renderActive(irAlActual){
   if(primeraVistaActiva){ irAlActual = true; primeraVistaActiva = false; }
 
   const list = document.getElementById('ordersList');
-  const activos = sortPedidos(pedidos.filter(p => !p.entregado));
+  const activos = sortPedidos(pedidos.filter(p => !p.entregado && coincide(p)));
   if(activos.length === 0){
-    list.innerHTML = '<div class="empty-msg">No hay pedidos activos. Registra uno arriba.</div>';
+    list.innerHTML = busqueda.trim() ? '<div class="empty-msg">Ningún pedido activo coincide con la búsqueda.</div>' : '<div class="empty-msg">No hay pedidos activos. Registra uno arriba.</div>';
     return;
   }
   const cardHtml = (p) => {
@@ -1176,8 +1189,10 @@ function renderActive(irAlActual){
 
 function renderHistory(){
   const mode = document.getElementById('histMode').value;
-  let entregados = pedidos.filter(p => p.entregado);
-  if(mode === 'dia'){
+  let entregados = pedidos.filter(p => p.entregado && coincide(p));
+  if(busqueda.trim()){
+    // buscando: se ignoran los filtros de fecha
+  }else if(mode === 'dia'){
     const d = document.getElementById('histDia').value;
     if(d) entregados = entregados.filter(p => p.fechaEntregaReal === d);
   }else if(mode === 'mes'){
@@ -1212,6 +1227,7 @@ function renderHistory(){
 }
 
 function render(){
+  renderBusquedaInfo();
   renderAlerts();
   renderCapacityPanel();
   renderActive();
@@ -2105,6 +2121,66 @@ async function repartirArchivos(files, imgs, fls){
       }
       render();
     }
+  });
+})();
+
+// ---------- Buscador (nombre, celular o número de recibo) y enlaces desde los avisos ----------
+let busqueda = '';
+const normTxt = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+function coincide(p){
+  const q = normTxt(busqueda).trim();
+  if(!q) return true;
+  if(normTxt(p.cliente).includes(q) || normTxt(p.recibo).includes(q) || normTxt(p.celular).includes(q)) return true;
+  const dq = q.replace(/\D/g, '');
+  return dq.length >= 3 && String(p.celular || '').replace(/\D/g, '').includes(dq);
+}
+function renderBusquedaInfo(){
+  const box = document.getElementById('buscaInfo');
+  if(!box) return;
+  if(!busqueda.trim()){ box.innerHTML = ''; return; }
+  const a = pedidos.filter(p => !p.entregado && coincide(p)).length;
+  const h = pedidos.filter(p => p.entregado && coincide(p)).length;
+  box.innerHTML = (a || h)
+    ? `Resultados: <button type="button" class="busca-tab" data-tab="active">${a} en pedidos activos</button> &middot; <button type="button" class="busca-tab" data-tab="history">${h} en historial</button>`
+    : 'Ningún pedido coincide con esa búsqueda.';
+}
+function verLista(tab){
+  document.querySelector(`.tab-btn[data-tab="${tab}"]`).click();
+  const el = document.getElementById(tab === 'active' ? 'ordersList' : 'historyList');
+  setTimeout(() => el.scrollIntoView({behavior: 'smooth', block: 'start'}), 50);
+}
+function irAPedido(id){
+  const p = pedidos.find(x => x.id === id);
+  if(!p) return;
+  if(busqueda){ busqueda = ''; document.getElementById('buscar').value = ''; render(); }
+  if(p.entregado){
+    const hm = document.getElementById('histMode');
+    if(hm.value !== 'todo'){ hm.value = 'todo'; hm.dispatchEvent(new Event('change')); }
+  }
+  document.querySelector(`.tab-btn[data-tab="${p.entregado ? 'history' : 'active'}"]`).click();
+  setTimeout(() => {
+    const el = document.querySelector(p.entregado ? `.hist-row[data-id="${id}"]` : `.order-card[data-id="${id}"]`);
+    if(!el) return;
+    el.scrollIntoView({behavior: 'smooth', block: 'center', inline: 'center'});
+    el.classList.add('flash');
+    setTimeout(() => el.classList.remove('flash'), 2800);
+  }, 80);
+}
+(function(){
+  const inp = document.getElementById('buscar');
+  inp.addEventListener('input', () => { busqueda = inp.value; renderActive(); renderHistory(); renderBusquedaInfo(); });
+  inp.addEventListener('keydown', (e) => {
+    if(e.key !== 'Enter') return;
+    e.preventDefault();
+    const a = pedidos.some(p => !p.entregado && coincide(p));
+    verLista(a || !pedidos.some(p => p.entregado && coincide(p)) ? 'active' : 'history');
+  });
+  document.getElementById('buscaInfo').addEventListener('click', (e) => {
+    const b = e.target.closest('.busca-tab'); if(b) verLista(b.dataset.tab);
+  });
+  document.getElementById('alertsBox').addEventListener('click', (e) => {
+    const a = e.target.closest('.goto-pedido'); if(!a) return;
+    e.preventDefault(); irAPedido(a.dataset.id);
   });
 })();
 
