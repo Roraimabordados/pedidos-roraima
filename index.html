@@ -103,6 +103,29 @@
   }
   .tab-btn:last-child{border-right:none;}
   .tab-btn.active{background:var(--paper); color:var(--ink);}
+  .tab-badge{display:inline-block; min-width:18px; padding:1px 6px; margin-left:6px; border-radius:9px; background:var(--late); color:#fff; font-size:11px; font-weight:600; vertical-align:middle;}
+  .tab-badge:empty{display:none;}
+  .cz-form{display:grid; grid-template-columns:1.3fr 1fr .9fr 1.6fr auto; gap:10px; align-items:end;}
+  .cz-form label{display:block; font-size:12px; color:var(--ink-soft); margin-bottom:4px;}
+  .cz-form input{width:100%;}
+  .cz-sub{font-size:13px; font-weight:600; color:var(--ink); margin:22px 0 8px;}
+  .cz-card{background:var(--card); border:1px solid var(--line); border-left:4px solid var(--gold); border-radius:var(--radius); padding:12px 14px; margin-bottom:10px;}
+  .cz-card.due{border-left-color:var(--late); background:var(--late-bg);}
+  .cz-top{display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:baseline;}
+  .cz-nom{font-weight:600;}
+  .cz-meta{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  .cz-state{font-size:12px; font-weight:600; margin-top:6px; color:var(--bronze-dark);}
+  .cz-card.due .cz-state{color:var(--late);}
+  .cz-acts{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;}
+  .cz-acts button{padding:8px 12px; border-radius:8px; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:13px;}
+  .cz-acts .cz-wa{background:#25D366; border-color:#25D366; color:#fff; font-weight:600;}
+  .cz-acts .cz-win{background:var(--income-bg); border-color:var(--income); color:var(--income); font-weight:600;}
+  .cz-stats{display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;}
+  .cz-stat{background:var(--gold-light); border-radius:8px; padding:8px 12px; font-size:13px;}
+  .cz-stat b{font-size:16px;}
+  .cz-empty{font-size:13px; color:var(--ink-soft); font-style:italic; padding:6px 0;}
+  .cz-done{font-size:12px; color:var(--ink-soft); padding:5px 0; border-bottom:1px dashed var(--line); display:flex; justify-content:space-between; gap:8px;}
+  @media (max-width:700px){ .cz-form{grid-template-columns:1fr 1fr;} .cz-form .cz-wide{grid-column:1 / -1;} }
   .tab-panel{display:none; padding:18px 24px 26px;}
   .tab-panel.active{display:block;}
 
@@ -463,6 +486,7 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="active">Pedidos activos</button>
       <button class="tab-btn" data-tab="history">Historial de entregas</button>
+      <button class="tab-btn" data-tab="cotiz">Cotizaciones<span class="tab-badge" id="cotizBadge"></span></button>
     </div>
 
     <div class="tab-panel active" id="panel-active">
@@ -592,6 +616,25 @@
       </div>
 
       <div id="ordersList"></div>
+    </div>
+
+    <div class="tab-panel" id="panel-cotiz">
+      <div class="form-card">
+        <p class="form-title">Anotar cotización enviada</p>
+        <div class="cz-form">
+          <div><label>Cliente</label><input id="czNombre" placeholder="Nombre" /></div>
+          <div><label>Celular</label><input id="czCel" inputmode="tel" placeholder="300 000 0000" /></div>
+          <div><label>Total cotizado</label><input id="czTotal" type="number" min="0" step="1" placeholder="0" /></div>
+          <div class="cz-wide"><label>Qu&eacute; cotiz&oacute; (opcional)</label><input id="czResumen" placeholder="Ej. 12 polos, bordado punto coraz&oacute;n" /></div>
+          <button type="button" class="btn-add" id="czGuardar">Guardar</button>
+        </div>
+        <p class="form-error" id="czError">Escribe al menos el nombre y el celular.</p>
+      </div>
+      <div class="cz-sub">Por seguimiento <span id="czCuentaPend"></span></div>
+      <div id="czLista"></div>
+      <div class="cz-sub">Resultados de las &uacute;ltimas cotizaciones</div>
+      <div class="cz-stats" id="czStats"></div>
+      <div id="czCerradas" style="margin-top:10px;"></div>
     </div>
 
     <div class="tab-panel" id="panel-history">
@@ -820,6 +863,7 @@ async function loadAll(){
   }catch(e){ ultimoRecibo = 0; }
   await imgCargarTodo();
   await cargarCatalogo();
+  await cargarCotiz();
   iniciarImgForm();
   iniciarFileForm();
   iniciarItemsForm();
@@ -945,6 +989,12 @@ function renderAlerts(){
   if(ready.length){
     html += `<div class="alert-box ready"><b>Listos, sin retirar (${ready.length}) &mdash; avisar al cliente</b>
       <ul class="alert-list">${ready.map(p => `<li><a href="#" class="goto-pedido" data-id="${p.id}">${escapeHtml(p.cliente)} ${p.celular ? '('+escapeHtml(p.celular)+')' : ''} &mdash; recibo ${escapeHtml(p.recibo||'-')}</a></li>`).join('')}</ul>
+    </div>`;
+  }
+  const czToc = czPendientes().filter(czToca);
+  if(czToc.length){
+    html += `<div class="alert-box ready"><b>Cotizaciones por seguimiento (${czToc.length}) &mdash; escr&iacute;beles hoy</b>
+      <ul class="alert-list">${czToc.map(c => `<li><a href="#" class="goto-cotiz">${escapeHtml(c.cliente)} &mdash; ${czEstadoTxt(c).split(' — ')[0].toLowerCase()}${c.total ? ', ' + fmt(c.total) : ''}</a></li>`).join('')}</ul>
     </div>`;
   }
   const fact = pedidos.filter(p => p.facturaElec && !p.facturaEmitida);
@@ -1275,6 +1325,7 @@ function render(){
   renderCapacityPanel();
   renderActive();
   renderHistory();
+  renderCotiz();
 }
 
 function registrarPedido(){
@@ -1600,7 +1651,7 @@ document.getElementById('syncNowBtn').addEventListener('click', () => {
 });
 
 document.getElementById('downloadBackupBtn').addEventListener('click', () => {
-  const data = {pedidos, metaDiaria, imagenes: imgCache, archivos: archivosParaBackup(), exportadoEl: new Date().toISOString()};
+  const data = {pedidos, metaDiaria, cotizaciones, imagenes: imgCache, archivos: archivosParaBackup(), exportadoEl: new Date().toISOString()};
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1632,6 +1683,7 @@ document.getElementById('restoreFile').addEventListener('change', (e) => {
         pedidos = pendingRestore.pedidos || [];
         Object.keys(pendingRestore.imagenes || {}).forEach(k => imgGuardar(k, pendingRestore.imagenes[k]));
         archivosDesdeBackup(pendingRestore.archivos);
+        if(Array.isArray(pendingRestore.cotizaciones)){ cotizaciones = pendingRestore.cotizaciones; await guardarCotiz(); }
         metaDiaria = pendingRestore.metaDiaria || 60;
         document.getElementById('metaDiaria').value = metaDiaria;
         await savePedidos();
@@ -1654,6 +1706,137 @@ document.getElementById('restoreFile').addEventListener('change', (e) => {
   };
   reader.readAsText(file);
 });
+
+
+// =====================================================================
+//  COTIZACIONES: seguimiento de clientes que pidieron precio
+// =====================================================================
+let cotizaciones = [];
+function fechaLocal(d){ d = d || new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function diasDesde(str){
+  if(!str) return 0;
+  const a = new Date(str + 'T00:00:00'), b = new Date(fechaLocal() + 'T00:00:00');
+  return Math.round((b - a) / 86400000);
+}
+async function guardarCotiz(){
+  try{ await window.storage.set('cotizaciones', JSON.stringify(cotizaciones)); setStatus('Guardado'); }catch(e){ console.error(e); setStatus('Error al guardar'); }
+}
+async function cargarCotiz(){
+  try{ const c = await window.storage.get('cotizaciones'); cotizaciones = c ? (JSON.parse(c.value) || []) : []; }catch(e){ cotizaciones = []; }
+}
+// Días que deben pasar desde el último contacto según cuántos seguimientos ya se hicieron
+const CZ_ESPERA = [1, 3, 5];
+function czPendientes(){ return cotizaciones.filter(c => c.estado === 'pendiente'); }
+function czToca(c){
+  if(c.estado !== 'pendiente' || c.seg >= CZ_ESPERA.length) return false;
+  return diasDesde(c.ultimoContacto) >= CZ_ESPERA[c.seg];
+}
+function czTelefono(cel){
+  let d = String(cel || '').replace(/\D/g, '');
+  if(d.length === 10 && d[0] === '3') d = '57' + d;
+  return d;
+}
+function czMensaje(c){
+  const n = (c.cliente || '').trim().split(/\s+/)[0] || '';
+  if(c.seg === 0) return `Hola ${n}, ¿cómo vas? Te escribo para saber si pudiste revisar la cotización 😊\n\nSi tienes alguna duda de precio, tiempos o del diseño, con gusto te ayudo. Y si quieres, te envío una muestra de cómo quedaría tu logo bordado, sin compromiso.`;
+  if(c.seg === 1) return `Hola ${n}, te escribo de Roraima Diseños y Bordados. ¿Pudiste decidir sobre la cotización? Si necesitas ajustar cantidad o algún detalle, lo revisamos juntos 😊`;
+  return `Hola ${n}, solo para dejarte la cotización disponible. Si más adelante la necesitas, escríbenos y la retomamos con gusto. ¡Gracias por tenernos en cuenta!`;
+}
+function czEstadoTxt(c){
+  const d = diasDesde(c.fecha);
+  const cot = d === 0 ? 'Cotizada hoy' : (d === 1 ? 'Cotizada ayer' : `Cotizada hace ${d} días`);
+  if(czToca(c)) return `${cot} — toca ${c.seg === 0 ? 'seguimiento' : (c.seg === 1 ? 'segundo seguimiento' : 'último aviso')}`;
+  if(c.seg >= CZ_ESPERA.length) return `${cot} — ya se hicieron los 3 contactos`;
+  const falta = CZ_ESPERA[c.seg] - diasDesde(c.ultimoContacto);
+  return `${cot} — ${c.seg ? c.seg + ' seguimiento(s) enviado(s), ' : ''}escribirle ${falta <= 1 ? 'mañana' : 'en ' + falta + ' días'}`;
+}
+function renderCotiz(){
+  const box = document.getElementById('czLista');
+  if(!box) return;
+  const pend = czPendientes().sort((a,b) => (czToca(b) - czToca(a)) || a.fecha.localeCompare(b.fecha));
+  const nToca = pend.filter(czToca).length;
+  const badge = document.getElementById('cotizBadge');
+  badge.textContent = nToca ? String(nToca) : '';
+  document.getElementById('czCuentaPend').textContent = pend.length ? `(${pend.length}${nToca ? ', ' + nToca + ' para hoy' : ''})` : '';
+  box.innerHTML = pend.length ? pend.map(c => `
+    <div class="cz-card ${czToca(c) ? 'due' : ''}" data-id="${c.id}">
+      <div class="cz-top"><span class="cz-nom">${escapeHtml(c.cliente)}</span><span><b>${c.total ? fmt(c.total) : ''}</b></span></div>
+      <div class="cz-meta">${escapeHtml(c.celular || '')}${c.resumen ? ' &middot; ' + escapeHtml(c.resumen) : ''}</div>
+      <div class="cz-state">${czEstadoTxt(c)}</div>
+      <div class="cz-acts">
+        ${c.celular && c.seg < CZ_ESPERA.length ? `<button type="button" class="cz-wa" data-a="wa">Enviar ${c.seg === 0 ? 'seguimiento' : (c.seg === 1 ? 'segundo mensaje' : '&uacute;ltimo aviso')}</button>` : ''}
+        <button type="button" class="cz-win" data-a="win">Confirm&oacute; &rarr; crear pedido</button>
+        <button type="button" data-a="lost">No compr&oacute;</button>
+        <button type="button" data-a="del">Borrar</button>
+      </div>
+    </div>`).join('') : '<div class="cz-empty">No hay cotizaciones por seguir. Cuando env&iacute;es una cotizaci&oacute;n por WhatsApp, an&oacute;tala arriba.</div>';
+
+  const cerr = cotizaciones.filter(c => c.estado !== 'pendiente');
+  const ganadas = cerr.filter(c => c.estado === 'ganada').length;
+  const perdidas = cerr.filter(c => c.estado === 'perdida');
+  const motivos = {};
+  perdidas.forEach(c => { const m = c.motivo || 'Otro'; motivos[m] = (motivos[m] || 0) + 1; });
+  const tasa = cerr.length ? Math.round(ganadas / cerr.length * 100) : 0;
+  document.getElementById('czStats').innerHTML = cotizaciones.length ? `
+    <div class="cz-stat"><b>${cotizaciones.length}</b> cotizadas</div>
+    <div class="cz-stat"><b>${ganadas}</b> se volvieron pedido</div>
+    <div class="cz-stat"><b>${perdidas.length}</b> no compraron</div>
+    ${cerr.length ? `<div class="cz-stat"><b>${tasa}%</b> de las cerradas se concretaron</div>` : ''}
+    ${Object.keys(motivos).map(m => `<div class="cz-stat">${escapeHtml(m)}: <b>${motivos[m]}</b></div>`).join('')}` : '<div class="cz-empty">Aqu&iacute; ver&aacute;s cu&aacute;ntas se concretan y por qu&eacute; no compran.</div>';
+  document.getElementById('czCerradas').innerHTML = cerr.slice().sort((a,b) => (b.cierre||'').localeCompare(a.cierre||'')).slice(0, 8).map(c =>
+    `<div class="cz-done"><span>${c.estado === 'ganada' ? '✔' : '✖'} ${escapeHtml(c.cliente)}${c.total ? ' &middot; ' + fmt(c.total) : ''}${c.estado === 'perdida' && c.motivo ? ' &middot; ' + escapeHtml(c.motivo) : ''}</span><button type="button" class="busca-tab" data-a="undo" data-id="${c.id}">Reabrir</button></div>`).join('');
+}
+(function iniciarCotiz(){
+  document.getElementById('czGuardar').addEventListener('click', () => {
+    const nombre = document.getElementById('czNombre').value.trim();
+    const cel = document.getElementById('czCel').value.trim();
+    const err = document.getElementById('czError');
+    if(!nombre || !cel){ err.style.display = 'block'; return; }
+    err.style.display = 'none';
+    cotizaciones.push({
+      id: uid(), cliente: nombre, celular: cel,
+      total: Number(document.getElementById('czTotal').value) || 0,
+      resumen: document.getElementById('czResumen').value.trim(),
+      fecha: fechaLocal(), ultimoContacto: fechaLocal(), seg: 0, estado: 'pendiente'
+    });
+    ['czNombre','czCel','czTotal','czResumen'].forEach(i => document.getElementById(i).value = '');
+    guardarCotiz(); render();
+    document.getElementById('czNombre').focus();
+  });
+  document.getElementById('panel-cotiz').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-a]'); if(!b) return;
+    const card = b.closest('.cz-card');
+    const id = card ? card.dataset.id : b.dataset.id;
+    const c = cotizaciones.find(x => x.id === id); if(!c) return;
+    const a = b.dataset.a;
+    if(a === 'wa'){
+      window.open('https://wa.me/' + czTelefono(c.celular) + '?text=' + encodeURIComponent(czMensaje(c)), '_blank');
+      c.seg += 1; c.ultimoContacto = fechaLocal();
+    }else if(a === 'win'){
+      c.estado = 'ganada'; c.cierre = fechaLocal();
+      guardarCotiz();
+      document.querySelector('.tab-btn[data-tab="active"]').click();
+      document.getElementById('fCliente').value = c.cliente;
+      document.getElementById('fCelular').value = c.celular;
+      if(c.total) document.getElementById('fMonto').value = c.total;
+      if(c.resumen) document.getElementById('fDescripcion').value = c.resumen;
+      render();
+      document.getElementById('fCliente').scrollIntoView({behavior:'smooth', block:'center'});
+      return;
+    }else if(a === 'lost'){
+      const m = prompt('¿Por qué no compró?\n1 = Precio\n2 = Tiempo de entrega\n3 = No respondió\n4 = Otro', '3');
+      if(m === null) return;
+      c.motivo = {'1':'Precio','2':'Tiempo de entrega','3':'No respondió','4':'Otro'}[m.trim()] || 'Otro';
+      c.estado = 'perdida'; c.cierre = fechaLocal();
+    }else if(a === 'del'){
+      if(!confirm('¿Borrar esta cotización?')) return;
+      cotizaciones = cotizaciones.filter(x => x.id !== id);
+    }else if(a === 'undo'){
+      c.estado = 'pendiente'; delete c.motivo; delete c.cierre;
+    }
+    guardarCotiz(); render();
+  });
+})();
 
 // =====================================================================
 //  ORDEN DE PEDIDO: detalle por líneas, número consecutivo y PDF
@@ -2234,6 +2417,8 @@ function irAPedido(id){
     const b = e.target.closest('.busca-tab'); if(b) verLista(b.dataset.tab);
   });
   document.getElementById('alertsBox').addEventListener('click', (e) => {
+    const cz = e.target.closest('.goto-cotiz');
+    if(cz){ e.preventDefault(); document.querySelector('.tab-btn[data-tab="cotiz"]').click(); return; }
     const a = e.target.closest('.goto-pedido'); if(!a) return;
     e.preventDefault(); irAPedido(a.dataset.id);
   });
