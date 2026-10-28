@@ -126,6 +126,35 @@
   .cz-empty{font-size:13px; color:var(--ink-soft); font-style:italic; padding:6px 0;}
   .cz-done{font-size:12px; color:var(--ink-soft); padding:5px 0; border-bottom:1px dashed var(--line); display:flex; justify-content:space-between; gap:8px;}
   @media (max-width:700px){ .cz-form{grid-template-columns:1fr 1fr;} .cz-form .cz-wide{grid-column:1 / -1;} }
+  .tab-btn[data-tab="cotiz"]{background:#D6E9FF; color:#0B4F9E; font-weight:700;}
+  .tab-btn[data-tab="cotiz"].active{background:#1565C0; color:#fff;}
+  #panel-cotiz{background:linear-gradient(#E3F0FF,#F3F8FF);}
+  #panel-cotiz .form-card{border:2px solid #1565C0; border-left:8px solid #1565C0; background:#fff;}
+  #panel-cotiz .form-title{color:#0B4F9E; font-weight:700;}
+  #czGuardar{background:#1565C0; color:#fff; border:none;}
+  #czGuardar:hover{background:#0D47A1; color:#fff;}
+  .cz-sub{color:#0B4F9E; font-size:15px; font-weight:700; border-bottom:3px solid #1565C0; padding-bottom:5px;}
+  .cz-card{border:1px solid #9CC4F2; border-left:6px solid #1565C0;}
+  .cz-card.due{border-color:#E0301E; border-left:6px solid #E0301E; background:#FFEAE6;}
+  .cz-state{color:#0B4F9E;}
+  .cz-card.due .cz-state{color:#C21B0A; font-size:13px;}
+  .cz-acts .cz-wa{background:#12B850; border-color:#12B850; font-size:14px;}
+  .cz-acts .cz-win{background:#D3F5E0; border-color:#12A34A; color:#0A6B30;}
+  .cz-stat{background:#D6E9FF; color:#0B4F9E; border:1px solid #9CC4F2;}
+  .cli-card{background:#fff; border:2px solid var(--bronze); border-radius:var(--radius); padding:14px 16px; margin-top:12px; text-align:left;}
+  .cli-head{display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:baseline;}
+  .cli-nom{font-size:17px; font-weight:700; color:var(--ink);}
+  .cli-tel{font-size:13px; color:var(--ink-soft);}
+  .cli-res{display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 10px;}
+  .cli-res span{background:var(--gold-light); border-radius:8px; padding:5px 10px; font-size:12px;}
+  .cli-res b{font-size:14px;}
+  .cli-row{display:grid; grid-template-columns:70px 78px 1fr 92px 110px auto; gap:8px; align-items:center; padding:8px 0; border-top:1px dashed var(--line); font-size:13px;}
+  .cli-row .cli-d{color:var(--ink-soft); font-size:12px;}
+  .cli-row .cli-t{text-align:right; font-weight:600;}
+  .cli-btns{display:flex; gap:6px;}
+  .cli-btns button{padding:6px 10px; border-radius:7px; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:12px;}
+  .cli-btns .cli-pdf{background:var(--cover); color:#fff; border-color:var(--cover);}
+  @media (max-width:700px){ .cli-row{grid-template-columns:1fr 1fr;} .cli-row .cli-t{text-align:left;} }
   .tab-panel{display:none; padding:18px 24px 26px;}
   .tab-panel.active{display:block;}
 
@@ -481,6 +510,7 @@
     <div class="search-bar">
       <input id="buscar" type="search" placeholder="Buscar por nombre, celular o número de recibo…" autocomplete="off" />
       <div class="busca-info" id="buscaInfo"></div>
+      <div id="clienteBox"></div>
     </div>
 
     <div class="tabs">
@@ -1996,6 +2026,7 @@ const CAT_DEFAULT = [
   {n:'Cuello redondo + bordado PC + estampado espalda', t:[[6,42550],[12,38500]]},
   {n:'Cuello redondo + estampado PC + estampado espalda', t:[[6,41550],[12,36200]]},
   {n:'Bordado punto corazón 9x9', t:[[1,10000],[6,9000],[12,8500],[24,7500],[36,6900]]},
+  {n:'Mangas', t:[[1,10000],[6,9000],[12,8500],[24,7500],[36,6900]]},
   {n:'Bordado espalda (hasta 30.000 puntadas)', t:[[1,22000],[12,20000]]},
   {n:'Bordado nombre toalla (máx 20 cm)', t:[[1,18000],[12,15000]]},
   {n:NOMBRE_DISENO, t:[[1,20000]]},
@@ -2046,7 +2077,7 @@ function precioPara(desc, cant){
   return mejor ? precioTier(mejor.c, cant || 1) : null;
 }
 function guardarCatalogo(){
-  try{ Promise.resolve(window.storage.set('catalogo', JSON.stringify({v: CAT_VERSION, items: catalogo}))).catch(() => {}); }catch(e){}
+  try{ Promise.resolve(window.storage.set('catalogo', JSON.stringify({v: CAT_VERSION, m: 1, items: catalogo}))).catch(() => {}); }catch(e){}
 }
 function actualizarDatalist(){
   const dl = document.getElementById('catList');
@@ -2071,7 +2102,16 @@ async function cargarCatalogo(){
     const c = await window.storage.get('catalogo');
     if(c){
       const o = JSON.parse(c.value);
-      if(o && o.v === CAT_VERSION && Array.isArray(o.items) && o.items.length) catalogo = o.items.map(x => x.n === 'Clínica Soma + profesión' ? Object.assign({}, x, {n: 'Logo institucional + profesión'}) : x);
+      if(o && o.v === CAT_VERSION && Array.isArray(o.items) && o.items.length){
+        catalogo = o.items.map(x => x.n === 'Clínica Soma + profesión' ? Object.assign({}, x, {n: 'Logo institucional + profesión'}) : x);
+        // Agrega "Mangas" una sola vez a catálogos guardados antes de que existiera
+        if(!o.m && !catalogo.some(x => /^mangas$/i.test(x.n))){
+          const i9 = catalogo.findIndex(x => /^Bordado punto coraz/i.test(x.n));
+          const nuevo = {n:'Mangas', t:[[1,10000],[6,9000],[12,8500],[24,7500],[36,6900]]};
+          if(i9 >= 0) catalogo.splice(i9 + 1, 0, nuevo); else catalogo.push(nuevo);
+          guardarCatalogo();
+        }
+      }
     }
   }catch(e){}
   renderCatalogo();
@@ -2375,6 +2415,7 @@ function coincide(p){
 function renderBusquedaInfo(){
   const box = document.getElementById('buscaInfo');
   if(!box) return;
+  renderClienteBox();
   if(!busqueda.trim()){ box.innerHTML = ''; return; }
   const a = pedidos.filter(p => !p.entregado && coincide(p)).length;
   const h = pedidos.filter(p => p.entregado && coincide(p)).length;
@@ -2382,6 +2423,48 @@ function renderBusquedaInfo(){
     ? `Resultados: <button type="button" class="busca-tab" data-tab="active">${a} en pedidos activos</button> &middot; <button type="button" class="busca-tab" data-tab="history">${h} en historial</button>`
     : 'Ningún pedido coincide con esa búsqueda.';
 }
+
+// ---------- Historial del cliente: todo lo que se le ha hecho, sin importar la fecha ----------
+function claveCliente(p){
+  const d = String(p.celular || '').replace(/\D/g, '');
+  return d.length >= 7 ? 'tel:' + d.slice(-10) : 'nom:' + normTxt(p.cliente).trim();
+}
+function resumenPedido(p){
+  const it = (p.items || []).filter(i => i && i.desc);
+  if(it.length) return it.slice(0, 2).map(i => (i.cant ? i.cant + ' ' : '') + i.desc).join(' · ') + (it.length > 2 ? ' · +' + (it.length - 2) + ' más' : '');
+  return p.descripcion || '(sin detalle)';
+}
+function renderClienteBox(){
+  const box = document.getElementById('clienteBox');
+  if(!box) return;
+  if(!busqueda.trim()){ box.innerHTML = ''; return; }
+  const claves = [];
+  pedidos.filter(coincide).forEach(p => { const k = claveCliente(p); if(!claves.includes(k)) claves.push(k); });
+  if(!claves.length){ box.innerHTML = ''; return; }
+  box.innerHTML = claves.slice(0, 3).map(k => {
+    const lista = pedidos.filter(p => claveCliente(p) === k).sort((a,b) => (b.fechaCreacion||'').localeCompare(a.fechaCreacion||''));
+    const ult = lista[0];
+    const total = lista.reduce((t,p) => t + (Number(p.monto) || 0), 0);
+    return `<div class="cli-card">
+      <div class="cli-head"><span class="cli-nom">${escapeHtml(ult.cliente)}</span><span class="cli-tel">${escapeHtml(ult.celular || 'sin celular')}</span></div>
+      <div class="cli-res"><span><b>${lista.length}</b> pedido(s)</span><span>Total hist&oacute;rico <b>${fmt(total)}</b></span><span>&Uacute;ltimo pedido <b>${fmtCorta(ult.fechaCreacion)}</b></span></div>
+      ${lista.map(p => `<div class="cli-row">
+        <span class="cli-d">${fmtCorta(p.fechaCreacion)}</span>
+        <span>Recibo <b>${escapeHtml(p.recibo || '-')}</b></span>
+        <span>${escapeHtml(resumenPedido(p))}</span>
+        <span class="cli-t">${fmt(p.monto)}</span>
+        <span class="cli-d">${p.entregado ? 'Entregado' + (p.fechaEntregaReal ? ' ' + fmtCorta(p.fechaEntregaReal) : '') : 'En curso'}</span>
+        <span class="cli-btns"><button type="button" class="cli-pdf" data-a="pdf" data-id="${p.id}">Orden PDF</button><button type="button" data-a="ver" data-id="${p.id}">Ver ficha</button></span>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+document.getElementById('clienteBox').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-a]'); if(!b) return;
+  const p = pedidos.find(x => x.id === b.dataset.id); if(!p) return;
+  if(b.dataset.a === 'pdf') imprimirOrden(p); else irAPedido(p.id);
+});
+
 function verLista(tab){
   document.querySelector(`.tab-btn[data-tab="${tab}"]`).click();
   const el = document.getElementById(tab === 'active' ? 'ordersList' : 'historyList');
@@ -2537,7 +2620,7 @@ function ordenHtml(p){
 <style>
   @page{size:A4; margin:8mm 12mm;}
   *{box-sizing:border-box;}
-  body{font-family:Arial,Helvetica,sans-serif; color:#222; font-size:11.5px; margin:0; padding-right:3px; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  body{font-family:Arial,Helvetica,sans-serif; color:#000; font-size:12.5px; margin:0; padding-right:3px; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
   .hdr{display:flex; justify-content:space-between; align-items:flex-start;}
   .logo{position:relative; width:93mm; height:32mm; overflow:hidden; flex:none;}
   .logo img{position:absolute; display:block; width:101.1mm; height:auto; left:-4.05mm; top:-18mm;}
@@ -2548,41 +2631,43 @@ function ordenHtml(p){
   .fec{display:inline-flex; margin-top:5px; border:1px solid #444; border-radius:6px; overflow:hidden;}
   .fec div{width:44px; text-align:center; font-size:11px; border-left:1px solid #444;}
   .fec div:first-child{border-left:0;}
-  .fec small{display:block; font-size:8px; color:#555; background:#f1f1f1;}
+  .fec small{display:block; font-size:9px; color:#000; font-weight:bold; background:#e4e4e4;}
   .fec span{display:block; height:17px; line-height:17px; font-weight:bold;}
   .fila{display:flex; gap:14px;}
   .f{display:flex; align-items:flex-end; gap:5px; margin-top:7px;}
-  .f .l{font-weight:bold; white-space:nowrap; font-size:11px;}
-  .f .v{flex:1; border-bottom:1px solid #333; min-height:15px; padding:0 3px; font-size:11.5px; line-height:15px;}
-  .obsl{border-bottom:1px solid #333; height:14px; margin-top:4px;}
+  .f .l{font-weight:bold; white-space:nowrap; font-size:12px; color:#000;}
+  .f .v{flex:1; border-bottom:1.2px solid #000; min-height:15px; padding:0 3px; font-size:13px; font-weight:bold; color:#000; line-height:15px;}
+  .obsl{border-bottom:1.2px solid #000; height:14px; margin-top:4px;}
   .sec{display:flex; gap:14px; margin-top:8px;}
   .izq{width:44%;}
   .der2{flex:1;}
-  .prendas{font-size:11px; line-height:2; margin-bottom:2px;}
-  .prendas u{display:inline-block; min-width:24px; text-align:center; border-bottom:1px solid #333; font-weight:bold; text-decoration:none; margin:0 6px 0 2px;}
+  .prendas{font-size:12px; font-weight:bold; line-height:2; margin-bottom:2px;}
+  .prendas u{display:inline-block; min-width:24px; text-align:center; border-bottom:1.2px solid #000; font-weight:bold; font-size:13px; text-decoration:none; margin:0 6px 0 2px;}
   .camisas{display:flex; gap:12px; justify-content:center;}
-  .cant{position:relative; border:1px solid #333; border-radius:7px; height:24px; width:104px; margin:0 0 6px auto; text-align:center;}
+  .cant{position:relative; border:1.3px solid #000; border-radius:7px; height:24px; width:104px; margin:0 0 6px auto; text-align:center;}
   .cant span{position:absolute; top:-8px; left:50%; transform:translateX(-50%); background:#1d1d1d; color:#fff; font-size:9px; padding:1px 8px; border-radius:6px;}
-  .cant b{line-height:24px; font-size:13px;}
-  .otros{border:1px solid #333; border-radius:10px; min-height:112px; padding:6px 10px;}
+  .cant b{line-height:24px; font-size:14px;}
+  .otros{border:1.3px solid #000; border-radius:10px; min-height:112px; padding:6px 10px;}
   .otros h5{margin:0 0 4px; font-size:17px; font-weight:normal;}
-  .otros div{font-size:12px; white-space:pre-wrap;}
+  .otros div{font-size:13px; font-weight:bold; white-space:pre-wrap;}
   .med .v{max-width:60px;}
-  table.t{width:100%; border-collapse:separate; border-spacing:0; border:1px solid #333; border-radius:10px; overflow:hidden;}
-  table.t th{border-right:1px solid #333; border-bottom:1px solid #333; font-size:9.5px; padding:5px 4px; font-weight:bold; text-transform:uppercase;}
-  table.t td{border-right:1px solid #333; border-bottom:1px solid #333; padding:0 5px; height:23px; font-size:11.5px;}
+  table.t{width:100%; border-collapse:separate; border-spacing:0; border:1.3px solid #000; border-radius:10px; overflow:hidden;}
+  table.t th{border-right:1.2px solid #000; border-bottom:1.2px solid #000; font-size:10.5px; padding:5px 4px; font-weight:bold; text-transform:uppercase;}
+  table.t td{border-right:1.2px solid #000; border-bottom:1.2px solid #000; padding:0 5px; height:23px; font-size:13px; font-weight:bold; color:#000;}
   table.t th:last-child, table.t td:last-child{border-right:0;}
   table.t tfoot td{border-bottom:0;}
   .c{text-align:center;} .r{text-align:right;}
-  .colores{width:30%; border:1px solid #333; border-radius:10px; padding:8px 10px;}
+  .colores{width:30%; border:1.3px solid #000; border-radius:10px; padding:8px 10px;}
   .colores h3{margin:0 0 6px; font-size:19px;}
-  .colores div{font-size:13px; line-height:1.5; white-space:pre-wrap;}
+  .colores div{font-size:14px; font-weight:bold; line-height:1.5; white-space:pre-wrap;}
   .pago{display:flex; gap:10px; margin-top:8px; align-items:stretch;}
-  .pago div{flex:1; border:1px solid #333; border-radius:6px; padding:5px 8px; font-size:11px;}
-  .pago b{display:block; font-size:14px;}
+  .pago div{flex:1; border:1.3px solid #000; border-radius:6px; padding:5px 8px; font-size:12px; font-weight:bold;}
+  .pago b{display:block; font-size:15px;}
   .pago .est{flex:1.6; text-align:center; font-weight:bold; letter-spacing:.03em; display:flex; align-items:center; justify-content:center; border-width:1.5px;}
-  .dir{text-align:center; font-weight:bold; font-size:12px; margin-top:22px; line-height:1.4;}
-  .pie{text-align:center; font-size:9px; color:#777; margin-top:6px;}
+  .dir{text-align:center; font-weight:bold; font-size:13px; color:#000; margin-top:22px; line-height:1.4;}
+  .pie{text-align:center; margin-top:10px; border:2px solid #000; border-radius:8px; padding:7px 10px; color:#000;}
+  .pie b{display:block; font-size:15px; letter-spacing:.04em;}
+  .pie span{display:block; font-size:11px; font-weight:bold; margin-top:2px;}
 </style></head><body>
   <div class="hdr">
     <div class="logo">${logo ? `<img src="${logo}" alt="Roraima">` : '<b style="font-size:26px">RORAIMA</b>'}</div>
@@ -2627,7 +2712,7 @@ function ordenHtml(p){
   </div>
 
   <div class="dir">Dirección: Cra. 45 #49-81 Edif. Copal Int. 201 Medellín-Antioquia<br>Telf.: 301 4395038 &middot; ${e(NEGOCIO.web)}</div>
-  <div class="pie">Documento interno de orden de pedido. No reemplaza la factura electrónica.${NEGOCIO.nota ? ' ' + e(NEGOCIO.nota) : ''}</div>
+  <div class="pie"><b>ORDEN DE PEDIDO INTERNA &mdash; NO ES FACTURA ELECTR&Oacute;NICA</b><span>Este documento no tiene validez fiscal y no reemplaza la factura electr&oacute;nica.${NEGOCIO.nota ? ' ' + e(NEGOCIO.nota) : ''}</span></div>
 </body></html>`;
 }
 function imprimirOrden(p){
