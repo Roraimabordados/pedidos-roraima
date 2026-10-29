@@ -1072,7 +1072,15 @@ function renderEditForm(p){
         <div class="full img-box">${imgBoxHtml(editImgs)}</div>
         <div class="full img-box file-box">${fileBoxHtml(editFiles)}</div>
         <div><label>Valor del pedido</label><input type="number" step="0.01" class="edit-input${(p.items&&p.items.length)?' auto-calc':''}" data-field="monto" value="${p.monto||0}" ${(p.items&&p.items.length)?'readonly':''} /></div>
-        <div><label>Cantidad de prendas</label><input type="number" min="1" step="1" class="edit-input${(p.items&&p.items.length)?' auto-calc':''}" data-field="cantidad" value="${p.cantidad||1}" ${(p.items&&p.items.length)?'readonly':''} /></div>
+        <div><label>Cantidad de prendas</label><input type="number" min="0" step="1" class="edit-input${(p.items&&p.items.length)?' auto-calc':''}" data-field="cantidad" value="${p.cantidad==null?1:p.cantidad}" ${(p.items&&p.items.length)?'readonly':''} /></div>
+        <div><label>Estado de pago</label>
+          <select class="edit-input" data-field="estadoPago">
+            <option value="pendiente" ${p.estadoPago==='pendiente'?'selected':''}>Pendiente</option>
+            <option value="abona" ${p.estadoPago==='abona'?'selected':''}>Abona</option>
+            <option value="completo" ${p.estadoPago==='completo'?'selected':''}>Total cancelado</option>
+          </select>
+        </div>
+        <div><label>Monto abonado (si abona)</label><input type="number" step="0.01" min="0" class="edit-input" data-field="montoAbonado" value="${p.montoAbonado||0}" /></div>
         <div><label>Forma de pago</label>
           <select class="edit-input" data-field="formaPago">
             ${['','Efectivo','Transferencia','Nequi / Daviplata','Tarjeta','Otro'].map(o => `<option value="${o}" ${(p.formaPago||'')===o?'selected':''}>${o||'Sin indicar'}</option>`).join('')}
@@ -1338,6 +1346,7 @@ function renderHistory(){
         <span class="hist-amount">${fmt(p.montoAbonado)}${restante(p) > 0 ? `<br/><span style="color:var(--late); font-weight:400; font-size:11px;">resta ${fmt(restante(p))}</span>` : ''}</span>
         <span class="hist-btns">
           ${p.facturaElec && !p.facturaEmitida ? '<button class="hist-undo fac-h" title="Marcar la factura electrónica como emitida">Factura emitida</button>' : ''}
+          ${restante(p) > 0 ? '<button class="hist-undo pago-h" title="Registrar que el cliente pagó el saldo o hizo un abono">Registrar pago</button>' : ''}
           <button class="hist-undo print-orden-h" title="Orden de pedido en PDF">Orden PDF</button>
           <button class="hist-undo undo-pedido" title="Regresar a pedidos activos">Deshacer</button>
         </span>
@@ -1383,8 +1392,8 @@ function registrarPedido(){
   if(estadoPago === 'completo') montoAbonado = monto;
   else if(estadoPago === 'abona') montoAbonado = parseFloat(document.getElementById('fMontoAbonado').value) || 0;
   const err = document.getElementById('formError');
-  if(!cliente || isNaN(monto) || !fechaPromesa || cantidad < 1){
-    err.textContent = 'Completa cliente, monto, fecha de promesa y cantidad de prendas (mínimo 1).';
+  if(!cliente || isNaN(monto) || !fechaPromesa || (cantidad < 1 && !items.length)){
+    err.textContent = 'Completa cliente, monto, fecha de promesa y cantidad de prendas (mínimo 1), o agrega al menos una línea en el detalle.';
     err.style.display = 'block';
     return null;
   }
@@ -1511,7 +1520,7 @@ document.getElementById('ordersList').addEventListener('click', (e) => {
       const antesItems = JSON.stringify(p.items || []);
       p.items = nuevosItems;
       if(nuevosItems.length){
-        p.cantidad = nuevosItems.filter(it => !esDiseno(it)).reduce((s,it) => s + it.cant, 0) || p.cantidad || 1;
+        p.cantidad = nuevosItems.filter(it => !esDiseno(it)).reduce((s,it) => s + it.cant, 0);
         p.monto = nuevosItems.reduce((s,it) => s + it.cant * it.val, 0);
       }
       if(JSON.stringify(nuevosItems) !== antesItems) cambios.push('Detalle del pedido actualizado (' + nuevosItems.length + ' línea(s)).');
@@ -1529,6 +1538,7 @@ document.getElementById('ordersList').addEventListener('click', (e) => {
       if(meta(fileCache[id]) !== meta(editFiles)){ cambios.push('Archivos de bordado actualizados (' + editFiles.length + ').'); fileGuardar(id, editFiles.slice()); }
     }
     if(p.estadoPago === 'completo') p.montoAbonado = p.monto;
+    if(p.estadoPago === 'pendiente') p.montoAbonado = 0;
     if(cambios.length){
       cambios.forEach(c => logChange(p, c));
     }
@@ -1627,6 +1637,20 @@ document.getElementById('historyList').addEventListener('click', (e) => {
   if(e.target.classList.contains('print-orden-h')){
     const pp = pedidos.find(x => x.id === row.dataset.id);
     if(pp) imprimirOrden(pp);
+    return;
+  }
+  if(e.target.classList.contains('pago-h')){
+    const p = pedidos.find(x => x.id === row.dataset.id);
+    if(!p) return;
+    const falta = restante(p);
+    const r = prompt('Saldo pendiente: ' + fmt(falta) + '\n\nEscribe cuánto pagó el cliente (déjalo así para registrar el saldo completo):', String(falta));
+    if(r === null) return;
+    const val = Math.min(falta, Math.max(0, parseFloat(String(r).replace(/[^\d.]/g, '')) || 0));
+    if(!val) return;
+    p.montoAbonado = (Number(p.montoAbonado) || 0) + val;
+    p.estadoPago = p.montoAbonado >= (Number(p.monto) || 0) ? 'completo' : 'abona';
+    logChange(p, `Pago registrado después de la entrega: ${fmt(val)} (${p.estadoPago === 'completo' ? 'total cancelado' : 'resta ' + fmt(restante(p))}).`);
+    render(); savePedidos();
     return;
   }
   if(e.target.classList.contains('fac-h')){
@@ -2575,7 +2599,7 @@ function lineasOrden(p){
   if(p.items && p.items.length){
     return p.items.map(it => ({desc: it.desc || 'Bordado', cant: it.cant, val: it.val, sub: it.cant * it.val}));
   }
-  const cant = Number(p.cantidad) || 1, total = Number(p.monto) || 0;
+  const cant = Number(p.cantidad) || 1, total = Number(p.monto) || 0;   // (solo para pedidos viejos sin detalle)
   return [{desc: 'Pedido de bordado', cant, val: Math.round(total / cant), sub: total}];
 }
 function fmtCorta(s){
